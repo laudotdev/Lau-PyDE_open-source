@@ -299,6 +299,17 @@ class MainWindow(QMainWindow):
         self.explorer.minimize_requested.connect(self._minimize_explorer)
         self.explorer.maximize_requested.connect(lambda: self._maximize_pane("explorer"))
 
+        # populate explorer commands list from available actions
+        try:
+            # gather actionable shortcuts from the menu actions that are enabled
+            actions = [
+                ("New File", self.findChild(QAction, "")),
+            ]
+        except Exception:
+            actions = []
+
+        # populate_commands will be called after menus are built
+
         self._runner = PythonRunner()
         self._runner.output_ready.connect(self._append_output)
         self._runner.finished.connect(self._on_run_finished)
@@ -386,6 +397,16 @@ class MainWindow(QMainWindow):
             output_maximize_button,
         ):
             pointer.setCursor(Qt.PointingHandCursor)
+        
+        # orientation toggle: switch between bottom (horizontal) and right (vertical)
+        self._output_orientation = "horizontal"  # or 'vertical'
+        self._output_orientation_button = QPushButton("⇨")
+        self._output_orientation_button.setToolTip("Move output to the right")
+        self._output_orientation_button.setFixedWidth(32)
+        self._output_orientation_button.setStyleSheet("border: none; min-height: 24px;")
+        self._output_orientation_button.setCursor(Qt.PointingHandCursor)
+        self._output_orientation_button.clicked.connect(self._toggle_output_orientation)
+        output_title_layout.addWidget(self._output_orientation_button)
 
         bottom_tabs = QTabWidget()
         bottom_tabs.addTab(output_container, "Output")
@@ -393,25 +414,32 @@ class MainWindow(QMainWindow):
         self._bottom_tabs = bottom_tabs
         self._output_container = output_container
 
-        # vertical splitter: editor on top, Output/Terminal tabs below.
-        editor_and_output = QSplitter(Qt.Vertical)
-        editor_and_output.addWidget(self._editor_stack) # pinalitan ko from self.editor to self.editor_stack
-        editor_and_output.addWidget(bottom_tabs)
-        editor_and_output.setStretchFactor(0, 3)
-        editor_and_output.setStretchFactor(1, 1)
-        self._editor_and_output = editor_and_output
+        # single splitter: editor stack and Output/Terminal tabs.
+        # We'll toggle its orientation between Qt.Vertical (output bottom)
+        # and Qt.Horizontal (output right) when the user clicks the control.
+        self._editor_and_output = QSplitter(Qt.Vertical)
+        self._editor_and_output.addWidget(self._editor_stack)
+        self._editor_and_output.addWidget(bottom_tabs)
+        self._editor_and_output.setStretchFactor(0, 3)
+        self._editor_and_output.setStretchFactor(1, 1)
 
         # horizontal splitter: explorer sidebar on the left, everything
         # else on the right. QSplitter lets the user drag to resize.
         main_splitter = QSplitter(Qt.Horizontal)
         main_splitter.addWidget(self.explorer)
-        main_splitter.addWidget(editor_and_output)
+        # add current active editor/output splitter
+        main_splitter.addWidget(self._editor_and_output)
         main_splitter.setStretchFactor(0, 0)
         main_splitter.setStretchFactor(1, 1)
         main_splitter.setSizes([220, 980])
         self._main_splitter = main_splitter
 
         self.setCentralWidget(main_splitter)
+        # ensure initial layout visibility and sizes are applied
+        try:
+            self._restore_layout()
+        except Exception:
+            pass
 
     # Search helpers
     def _open_search(self) -> None:
@@ -608,6 +636,28 @@ class MainWindow(QMainWindow):
         show_terminal_action.triggered.connect(lambda: self._show_bottom_panel("terminal"))
         view_menu.addAction(show_terminal_action)
 
+        # action to show/hide commands list in explorer
+        show_commands_list_action = QAction("Show Commands List", self)
+        show_commands_list_action.setCheckable(True)
+        show_commands_list_action.setChecked(self.explorer._commands_section.isVisible())
+
+        # when the menu action is toggled, use the explorer's toggle method
+        def _menu_toggle_commands(checked: bool) -> None:
+            try:
+                self.explorer._toggle_commands_section()
+            except Exception:
+                pass
+
+        show_commands_list_action.triggered.connect(_menu_toggle_commands)
+
+        # keep action in sync when explorer toggles it using the header button
+        try:
+            self.explorer.commands_visibility_changed.connect(lambda visible: show_commands_list_action.setChecked(visible))
+        except Exception:
+            pass
+
+        view_menu.addAction(show_commands_list_action)
+
         restore_layout_action = QAction("Restore Layout", self)
         restore_layout_action.triggered.connect(self._restore_layout)
         restore_layout_action.setShortcut(QKeySequence("Ctrl+0"))
@@ -648,6 +698,13 @@ class MainWindow(QMainWindow):
         update_action.setShortcut(QKeySequence("Ctrl+U"))
         update_action.triggered.connect(self._update_lau_pyde)
         help_menu.addAction(update_action)
+
+        # populate explorer commands now that menus/actions exist
+        try:
+            if hasattr(self.explorer, 'populate_commands'):
+                self.explorer.populate_commands(self)
+        except Exception:
+            pass
 
     # file operations
     def _project_root(self) -> Path:
@@ -959,7 +1016,30 @@ class MainWindow(QMainWindow):
 
             if folder and Path(folder).is_dir():
                 self._current_folder = folder
+                # restore the exact folder as the explorer root and ensure
+                # the explorer shows the project's commands section.
                 self.explorer.set_root_folder(folder)
+                try:
+                    # prefer showing the project folder itself as the tree root
+                    idx = self.explorer._model.index(str(folder))
+                    if idx.isValid():
+                        self.explorer._tree.setRootIndex(idx)
+                        try:
+                            self.explorer._tree.expand(idx)
+                            self.explorer._tree.setCurrentIndex(idx)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                try:
+                    # ensure commands section is visible and layout is restored
+                    try:
+                        self.explorer._commands_section.show()
+                        self.explorer._commands_section.setMaximumHeight(16777215)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
                 try:
                     self.explorer.show()
                 except Exception:
@@ -1189,6 +1269,16 @@ class MainWindow(QMainWindow):
         self._editor_stack.setCurrentWidget(self._editor_container)
         self._editor_container.show()
         self.editor.show()
+        # ensure the active editor-output splitter is in the main splitter
+        # and visible. Default active splitter is vertical (bottom output).
+        try:
+            # replace the widget in main splitter if needed
+            right_index = 1
+            if self._main_splitter.widget(right_index) is not self._editor_and_output:
+                # remove existing and insert the active splitter
+                self._main_splitter.replaceWidget(right_index, self._editor_and_output)
+        except Exception:
+            pass
         self._editor_and_output.show()
         self._editor_and_output.setVisible(True)
 
@@ -1203,14 +1293,66 @@ class MainWindow(QMainWindow):
         self._main_splitter.setSizes([220, max(1, self.width() - 220)])
 
         if not self._bottom_minimized:
-            self._editor_and_output.setSizes([max(1, self.height() - 260), 260])
+            # when not minimized, sizing depends on orientation
+            if self._output_orientation == "horizontal":
+                # vertical splitter: editor height larger than bottom panel
+                if self._editor_and_output.orientation() == Qt.Vertical:
+                    self._editor_and_output.setSizes([max(1, self.height() - 260), 260])
+                else:
+                    # fallback: ensure reasonable sizes
+                    self._editor_and_output.setSizes([max(1, self.width() - 360), 360])
+            else:
+                # vertical (right) mode: set horizontal splitter sizes
+                if self._editor_and_output.orientation() == Qt.Horizontal:
+                    self._editor_and_output.setSizes([max(1, self.width() - 360), 360])
+                else:
+                    self._editor_and_output.setSizes([max(1, self.height() - 260), 260])
         else:
-            self._editor_and_output.setSizes([max(1, self.height() - 40), 40])
+            if self._output_orientation == "horizontal":
+                if self._editor_and_output.orientation() == Qt.Vertical:
+                    self._editor_and_output.setSizes([max(1, self.height() - 40), 40])
+                else:
+                    self._editor_and_output.setSizes([max(1, self.width() - 80), 80])
+            else:
+                if self._editor_and_output.orientation() == Qt.Horizontal:
+                    self._editor_and_output.setSizes([max(1, self.width() - 80), 80])
+                else:
+                    self._editor_and_output.setSizes([max(1, self.height() - 40), 40])
 
     def _show_explorer(self) -> None:
         self._restore_layout()
         self._explorer_minimized = False
         self.explorer.show()
+
+    def _toggle_output_orientation(self) -> None:
+        """Toggle output area orientation between bottom (horizontal) and right (vertical)."""
+        old = self._output_orientation
+        new = "vertical" if old == "horizontal" else "horizontal"
+        self._output_orientation = new
+
+        # update icon and tooltip
+        if new == "vertical":
+            self._output_orientation_button.setText("⇦")
+            self._output_orientation_button.setToolTip("Move output to bottom")
+            # switch splitter orientation to horizontal (editor left, output right)
+            try:
+                self._editor_and_output.setOrientation(Qt.Horizontal)
+            except Exception:
+                pass
+        else:
+            self._output_orientation_button.setText("⇨")
+            self._output_orientation_button.setToolTip("Move output to the right")
+            # switch splitter orientation to vertical (editor top, output bottom)
+            try:
+                self._editor_and_output.setOrientation(Qt.Vertical)
+            except Exception:
+                pass
+
+        # replace the widget in the main splitter and restore layout
+        try:
+            self._restore_layout()
+        except Exception:
+            pass
 
     # shwow welcome message method
     def _show_welcome(self) -> None:
@@ -1430,5 +1572,12 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
             self._runner.stop()
+
+        # persist current project folder so it is restored on next launch
+        try:
+            if self._current_folder:
+                RECENT_PROJECT_FILE.write_text(json.dumps({"project": self._current_folder}))
+        except Exception:
+            pass
 
         event.accept()

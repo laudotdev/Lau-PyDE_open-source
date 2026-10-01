@@ -40,7 +40,13 @@ class PythonRunner(QObject):
 
         # sys.executable is the interpreter currently running PyDE
         # itself — using it means "run with the same Python PyDE uses".
-        self._process.start(sys.executable, [file_path])
+        # self._process.start(sys.executable, [file_path])
+        
+        # changed this if-else block on october 1, 2026 arch linux
+        if getattr(sys, "frozen", False) and sys.platform == "win32":
+            self.process.start("py", [file_path])
+        else:
+            self.process.start(sys.excutable, [file_path])
 
     def stop(self) -> None:
         """Stop the currently running process, if any."""

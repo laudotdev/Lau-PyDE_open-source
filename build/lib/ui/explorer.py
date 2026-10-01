@@ -14,6 +14,7 @@ import os
 import sys
 import shutil
 import subprocess
+import typing
 
 from PySide6.QtCore import Signal, Qt, QModelIndex, QDir, QUrl
 from PySide6.QtGui import QColor, QPainter, QAction
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QMessageBox,
     QFileDialog,
+    QSizePolicy,
 )
 
 class ErrorCountDelegate(QStyledItemDelegate):
@@ -89,6 +91,7 @@ class FileExplorer(QWidget):
     file_double_clicked = Signal(str)
     minimize_requested = Signal()
     maximize_requested = Signal()
+    commands_visibility_changed = Signal(bool)
 
     def __init__(self):
         super().__init__()
@@ -102,11 +105,13 @@ class FileExplorer(QWidget):
         self._model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files)
 
         self._error_counts = {}
+        self._project_root = None
 
         self._tree = QTreeView()
         self._tree.setModel(self._model)
         self._tree.setItemDelegate(ErrorCountDelegate(self, self._tree))
         self._tree.setHeaderHidden(True)
+        self._tree.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
         # Only the "name" column matters here; hide size/type/date columns.
         for column in (1, 2, 3):
@@ -148,7 +153,43 @@ class FileExplorer(QWidget):
         layout.setSpacing(0)
         layout.addWidget(title_bar)
         layout.addWidget(self._tree)
+
+        # commands list section: shows compact list of available commands
+        self._commands_section = QWidget()
+        cmds_layout = QVBoxLayout(self._commands_section)
+        cmds_layout.setContentsMargins(6, 6, 6, 6)
+        cmds_layout.setSpacing(4)
+
+        # header with label and minimize button
+        self._commands_header = QWidget()
+        ch_layout = QHBoxLayout(self._commands_header)
+        ch_layout.setContentsMargins(0, 0, 0, 0)
+        ch_layout.setSpacing(4)
+        self._commands_label = QLabel("Commands")
+        self._commands_label.setStyleSheet("font-size: 11px; font-weight: bold;")
+        ch_layout.addWidget(self._commands_label)
+        ch_layout.addStretch()
+        self._commands_toggle = QPushButton("▁")
+        self._commands_toggle.setFixedWidth(28)
+        self._commands_toggle.setStyleSheet("border: none; min-height: 20px;")
+        self._commands_toggle.setCursor(Qt.PointingHandCursor)
+        self._commands_toggle.setToolTip("Minimize commands list")
+        self._commands_toggle.clicked.connect(self._toggle_commands_section)
+        ch_layout.addWidget(self._commands_toggle)
+
+        cmds_layout.addWidget(self._commands_header)
+
+        self._commands_list = QWidget()
+        self._commands_list_layout = QVBoxLayout(self._commands_list)
+        self._commands_list_layout.setContentsMargins(0, 0, 0, 0)
+        self._commands_list_layout.setSpacing(2)
+        cmds_layout.addWidget(self._commands_list)
+        self._commands_section.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+
+        layout.addWidget(self._commands_section)
         layout.addStretch()
+        # track whether the commands section is currently in the layout
+        self._commands_section_in_layout = True
 
         # context menu for file actions
         self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -158,6 +199,12 @@ class FileExplorer(QWidget):
 
     def set_root_folder(self, folder_path: str | None) -> None:
         """Point the explorer at a new project folder."""
+        # store a normalized project root to make comparisons robust
+        try:
+            self._project_root = str(Path(folder_path).resolve()) if folder_path else None
+        except Exception:
+            # fallback to the raw string when resolve fails
+            self._project_root = str(Path(folder_path)) if folder_path else None
         # if no folder is open, hide the tree
         if not folder_path:
             # unhide any previously hidden rows
@@ -167,6 +214,16 @@ class FileExplorer(QWidget):
             except Exception:
                 pass
             self._tree.hide()
+            # hide commands section when no folder open
+            try:
+                self._commands_section.hide()
+                try:
+                    self._commands_toggle.setText("▢")
+                    self._commands_toggle.setToolTip("Restore commands list")
+                except Exception:
+                    pass
+            except Exception:
+                pass
             return
         p = Path(folder_path)
         try:
@@ -188,10 +245,21 @@ class FileExplorer(QWidget):
                 self._tree.setRootIndex(parent_idx)
 
                 # hide all rows except the chosen folder
+                # compare paths using resolution and case-normalization so
+                # Windows path variants (case/different separators) do not
+                # cause the chosen folder to be hidden by accident.
+                def _norm_path(x: str) -> str:
+                    try:
+                        return str(Path(x).resolve())
+                    except Exception:
+                        return os.path.normcase(os.path.normpath(str(x)))
+
+                target_norm = _norm_path(p)
                 for row in range(self._model.rowCount(parent_idx)):
                     child = self._model.index(row, 0, parent_idx)
                     child_path = self._model.filePath(child)
-                    hide = child_path != str(p)
+                    child_norm = _norm_path(child_path)
+                    hide = child_norm != target_norm
                     try:
                         self._tree.setRowHidden(row, parent_idx, hide)
                     except Exception:
@@ -210,6 +278,15 @@ class FileExplorer(QWidget):
                     pass
 
                 self._tree.show()
+                try:
+                    self._commands_section.show()
+                    try:
+                        self._commands_toggle.setText("▁")
+                        self._commands_toggle.setToolTip("Minimize commands list")
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
                 return
 
             # fallback: set the model root directly to the folder
@@ -222,6 +299,15 @@ class FileExplorer(QWidget):
                 except Exception:
                     pass
                 self._tree.show()
+            try:
+                self._commands_section.show()
+                try:
+                    self._commands_toggle.setText("▁")
+                    self._commands_toggle.setToolTip("Minimize commands list")
+                except Exception:
+                    pass
+            except Exception:
+                pass
         except Exception:
             # fallback: try setting the model root to the provided path
             try:
@@ -237,30 +323,63 @@ class FileExplorer(QWidget):
             self.file_double_clicked.emit(path)
 
     def reveal_path(self, file_path: str) -> None:
-        """Ensure the file's folder is the explorer root and select the file."""
+        """Ensure the file is selected without collapsing the current project tree."""
         p = Path(file_path)
         if not p.exists():
             return
 
+        root_folder = self._project_root
+        project_root = Path(root_folder) if root_folder else None
+
+        # Keep the active project root stable when a file inside that project is
+        # opened. Resetting to the file's parent folder is what collapses the
+        # visible hierarchy and hides the parent folders from the user.
+        if project_root and p.is_relative_to(project_root):
+            idx = self._model.index(str(p))
+            if not idx.isValid():
+                parent_idx = self._model.index(str(p.parent))
+                if parent_idx.isValid():
+                    name = p.name
+                    for row in range(self._model.rowCount(parent_idx)):
+                        child = self._model.index(row, 0, parent_idx)
+                        if self._model.fileName(child) == name:
+                            idx = child
+                            break
+
+            if idx.isValid():
+                parent = idx.parent()
+                parents = []
+                while parent.isValid():
+                    parents.append(parent)
+                    parent = parent.parent()
+
+                for pidx in reversed(parents):
+                    try:
+                        self._tree.expand(pidx)
+                    except Exception:
+                        pass
+
+                self._tree.setCurrentIndex(idx)
+                self._tree.scrollTo(idx)
+            return
+
+        # Only fall back to the file's parent when the selected file is outside
+        # the currently opened project; keep the same folder-root pattern used in
+        # `set_root_folder` for that case.
         folder = str(p.parent)
-        # Reset the model root to the file's parent so it is visible
         try:
             root_index = self._model.setRootPath(folder)
             self._tree.setRootIndex(root_index)
         except Exception:
-            # fallback to the helper which also hides/shows the tree
             try:
                 self.set_root_folder(folder)
             except Exception:
                 pass
 
-        # find the index for the file and select it
         idx = self._model.index(str(p))
         if not idx.isValid():
-            # sometimes index creation depends on the view root; try using the parent index
             parent_idx = self._model.index(folder)
             if parent_idx.isValid():
-                # look for a matching child by name
                 name = p.name
                 for row in range(self._model.rowCount(parent_idx)):
                     child = self._model.index(row, 0, parent_idx)
@@ -269,7 +388,6 @@ class FileExplorer(QWidget):
                         break
 
         if idx.isValid():
-            # expand parent chain so the item is visible
             parent = idx.parent()
             parents = []
             while parent.isValid():
@@ -334,6 +452,198 @@ class FileExplorer(QWidget):
 
         menu.exec(self._tree.viewport().mapToGlobal(pos))
 
+    def _toggle_commands_section(self) -> None:
+        try:
+            if self._commands_section.isVisible():
+                # remove the commands section from the layout so its
+                # vertical space is released and the tree expands into it.
+                try:
+                    if self._commands_section_in_layout:
+                        # find the index of the commands widget and remove it
+                        parent_layout = self.layout()
+                        for i in range(parent_layout.count()):
+                            item = parent_layout.itemAt(i)
+                            try:
+                                if item and item.widget() is self._commands_section:
+                                    try:
+                                        parent_layout.takeAt(i)
+                                    except Exception:
+                                        try:
+                                            parent_layout.removeItem(item)
+                                        except Exception:
+                                            pass
+                                    break
+                            except Exception:
+                                pass
+                        self._commands_section_in_layout = False
+                except Exception:
+                    pass
+                try:
+                    self._commands_section.hide()
+                except Exception:
+                    pass
+                self._commands_toggle.setText("▢")
+                self._commands_toggle.setToolTip("Restore commands list")
+
+                try:
+                    # ensure layout updates so the tree expands into freed space
+                    self._tree.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+                    try:
+                        parent_layout = self.layout()
+                        # title_bar=0, tree=1, commands_section=2, stretch=3
+                        parent_layout.setStretch(1, 1)
+                        parent_layout.setStretch(2, 0)
+                    except Exception:
+                        pass
+                    try:
+                        self.layout().invalidate()
+                        self.updateGeometry()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+                try:
+                    self.commands_visibility_changed.emit(False)
+                except Exception:
+                    pass
+            else:
+                # show and restore previous sizing
+                # re-insert the commands section into the layout so it
+                # reclaims its vertical space next to the tree.
+                try:
+                    if not self._commands_section_in_layout:
+                        parent_layout = self.layout()
+                        try:
+                            # insert after title_bar(0) and tree(1)
+                            parent_layout.insertWidget(2, self._commands_section)
+                        except Exception:
+                            # fallback: add widget if insertWidget fails
+                            try:
+                                parent_layout.addWidget(self._commands_section)
+                            except Exception:
+                                pass
+                        self._commands_section_in_layout = True
+                except Exception:
+                    pass
+                try:
+                    self._commands_section.show()
+                except Exception:
+                    pass
+
+                self._commands_toggle.setText("▁")
+                self._commands_toggle.setToolTip("Minimize commands list")
+
+                try:
+                    self._tree.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+                    try:
+                        parent_layout = self.layout()
+                        parent_layout.setStretch(1, 0)
+                        parent_layout.setStretch(2, 0)
+                    except Exception:
+                        pass
+                    try:
+                        self.layout().invalidate()
+                        self.updateGeometry()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+                try:
+                    self.commands_visibility_changed.emit(True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def populate_commands(self, main_window) -> None:
+        """Populate the compact commands list using real QAction objects
+        from the provided MainWindow. Only include actions with a
+        visible shortcut that are enabled on this platform.
+        """
+        # clear
+        for i in reversed(range(self._commands_list_layout.count())):
+            w = self._commands_list_layout.itemAt(i).widget()
+            if w:
+                w.setParent(None)
+
+        # Walk the menu bar and collect QAction entries.
+        found: list[tuple[str, str]] = []
+
+        def collect_actions(menu):
+            for act in menu.actions():
+                try:
+                    if act.isSeparator():
+                        continue
+                except Exception:
+                    pass
+                try:
+                    txt = act.text()
+                except Exception:
+                    txt = ""
+                try:
+                    shortcut = act.shortcut().toString()
+                except Exception:
+                    shortcut = ""
+
+                if txt:
+                    # normalize displayed text (remove trailing ellipses)
+                    display = txt.replace('&', '').strip()
+                    found.append((display, shortcut))
+                # recurse into submenus
+                try:
+                    sub = act.menu()
+                    if sub:
+                        collect_actions(sub)
+                except Exception:
+                    pass
+
+        try:
+            menubar = main_window.menuBar()
+            for top in menubar.actions():
+                try:
+                    sub = top.menu()
+                    if sub:
+                        collect_actions(sub)
+                except Exception:
+                    pass
+        except Exception:
+            # fallback: inspect all QAction children
+            for act in main_window.findChildren(QAction):
+                try:
+                    txt = act.text()
+                    shortcut = act.shortcut().toString()
+                except Exception:
+                    continue
+                if txt:
+                    found.append((txt.replace('&', '').strip(), shortcut))
+
+        # dedupe while preserving order
+        seen = set()
+        deduped: list[tuple[str, str]] = []
+        for t, s in found:
+            key = (t, s)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append((t, s))
+
+        is_windows = os.name == 'nt'
+        for text, shortcut in deduped:
+            # on Windows, some platform-specific sequences may be less useful
+            if is_windows and shortcut.startswith("Meta"):
+                continue
+            label_text = f"{text}    {shortcut}" if shortcut else text
+            lbl = QLabel(label_text)
+            lbl.setStyleSheet("font-size: 11px; color: #bdbdbd;")
+            self._commands_list_layout.addWidget(lbl)
+
+        if not deduped:
+            lbl = QLabel("No commands available")
+            lbl.setStyleSheet("font-size: 11px; color: #777777;")
+            self._commands_list_layout.addWidget(lbl)
+
     def _create_file(self, folder_path: str) -> None:
         name, ok = QInputDialog.getText(self, 'New File', 'File name:')
         if not ok or not name.strip():
@@ -344,8 +654,14 @@ class FileExplorer(QWidget):
         except OSError as e:
             QMessageBox.critical(self, 'Error', f'Could not create file:\n{e}')
             return
-        # refresh
-        self._model.directoryLoaded.emit(str(folder_path))
+        # refresh model for the folder so the new file appears
+        try:
+            self._model.setRootPath(str(folder_path))
+        except Exception:
+            try:
+                self._model.directoryLoaded.emit(str(folder_path))
+            except Exception:
+                pass
 
     def _create_folder(self, folder_path: str) -> None:
         name, ok = QInputDialog.getText(self, 'New Folder', 'Folder name:')
@@ -357,7 +673,13 @@ class FileExplorer(QWidget):
         except OSError as e:
             QMessageBox.critical(self, 'Error', f'Could not create folder:\n{e}')
             return
-        self._model.directoryLoaded.emit(str(folder_path))
+        try:
+            self._model.setRootPath(str(folder_path))
+        except Exception:
+            try:
+                self._model.directoryLoaded.emit(str(folder_path))
+            except Exception:
+                pass
 
     def _rename(self, path: str) -> None:
         p = Path(path)
@@ -371,7 +693,13 @@ class FileExplorer(QWidget):
             QMessageBox.critical(self, 'Error', f'Could not rename:\n{e}')
             return
         parent = str(p.parent)
-        self._model.directoryLoaded.emit(parent)
+        try:
+            self._model.setRootPath(parent)
+        except Exception:
+            try:
+                self._model.directoryLoaded.emit(parent)
+            except Exception:
+                pass
 
     def _delete(self, path: str) -> None:
         p = Path(path)
@@ -386,7 +714,13 @@ class FileExplorer(QWidget):
         except OSError as e:
             QMessageBox.critical(self, 'Error', f'Could not delete:\n{e}')
             return
-        self._model.directoryLoaded.emit(str(p.parent))
+        try:
+            self._model.setRootPath(str(p.parent))
+        except Exception:
+            try:
+                self._model.directoryLoaded.emit(str(p.parent))
+            except Exception:
+                pass
 
     def _copy_path(self, path: str) -> None:
         clipboard = QApplication.clipboard()
