@@ -57,7 +57,9 @@ class InlineInputOutput(QPlainTextEdit):
         and event.modifiers() & Qt.ControlModifier):
             
             if self.textCursor().hasSelection():
+                selection = QTextCursor(self.textCursor())
                 self.copy()
+                self.setTextCursor(selection)
                 return
             if self._interrupt_enabled:
                 self.interrupt_requested.emit()

@@ -694,18 +694,10 @@ class CodeEditor(QPlainTextEdit):
                         remove_count = min(4, spaces)
 
                         if remove_count:
-                            line_cursor.movePosition(
-                                QTextCursor.StartOfBlock
-                            )
-                            line_cursor.movePosition(
-                                QTextCursor.Right,
-                                QTextCursor.MoveAnchor,
-                                remove_count,
-                            )
-                            line_cursor.movePosition(
-                                QTextCursor.Left,
+                            line_cursor.setPosition(block.position())
+                            line_cursor.setPosition(
+                                block.position() + remove_count,
                                 QTextCursor.KeepAnchor,
-                                remove_count,
                             )
                             line_cursor.removeSelectedText()
                     else:

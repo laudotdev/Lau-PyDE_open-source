@@ -720,7 +720,12 @@ class MainWindow(QMainWindow):
         while widget is not None:
             method = getattr(widget, operation, None)
             if callable(method):
-                method()
+                if operation == "copy" and hasattr(widget, "textCursor"):
+                    selection = QTextCursor(widget.textCursor())
+                    method()
+                    widget.setTextCursor(selection)
+                else:
+                    method()
                 return
             widget = widget.parentWidget()
         getattr(self.editor, operation)()
