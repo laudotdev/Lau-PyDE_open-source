@@ -56,7 +56,10 @@ class InlineInputOutput(QPlainTextEdit):
         if (event.key() == Qt.Key_C
         and event.modifiers() & Qt.ControlModifier):
             
-            if self._interrupt_enabled and not self.textCursor().hasSelection():
+            if self.textCursor().hasSelection():
+                self.copy()
+                return
+            if self._interrupt_enabled:
                 self.interrupt_requested.emit()
                 return
 
@@ -112,9 +115,10 @@ class InlineInputOutput(QPlainTextEdit):
             super().mousePressEvent(event)
             return
 
+        # Keep the clicked selection intact so users can select and copy
+        # any previous command output. Key presses still redirect edits
+        # away from the protected output below.
         super().mousePressEvent(event)
-        if self.textCursor().position() < self._input_start:
-            self._move_to_input_end()
 
     def set_interrupt_enabled(self, enabled: bool) -> None:
         self._interrupt_enabled = enabled
