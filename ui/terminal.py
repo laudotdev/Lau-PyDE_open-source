@@ -1,6 +1,7 @@
 import re
 import os
 import sys
+import shlex
 from pathlib import Path
 
 from PySide6.QtCore import QProcess, Signal, Qt
@@ -97,6 +98,10 @@ class TerminalPanel(QWidget):
             self._show_prompt()
             return
 
+        if self._change_directory(command):
+            self._show_prompt()
+            return
+
         self._process = QProcess()
         self._output.set_interrupt_enabled(True)
         self._process.setWorkingDirectory(self._working_dir)
@@ -109,6 +114,39 @@ class TerminalPanel(QWidget):
         # shell-builtins behave as expected on each platform.
         shell, arguments = self._shell_command(command)
         self._process.start(shell, arguments)
+        # Interactive programs such as `python` must be able to receive
+        # stdin while they are running; waiting for process completion would
+        # make the terminal appear frozen.
+        self._output.start_input()
+
+    def _change_directory(self, command: str) -> bool:
+        """Handle cd in the panel so it persists between commands."""
+        stripped = command.strip()
+        if not stripped or stripped == "cd" or stripped.startswith("cd "):
+            if stripped == "cd":
+                target = Path.home()
+            else:
+                argument = stripped[3:].strip()
+                try:
+                    parts = shlex.split(argument, posix=(os.name != "nt"))
+                except ValueError:
+                    return False
+                if len(parts) != 1:
+                    return False
+                target = Path(parts[0]).expanduser()
+                if not target.is_absolute():
+                    target = Path(self._working_dir) / target
+            try:
+                target = target.resolve()
+            except OSError:
+                return False
+            if not target.is_dir():
+                self._output.appendPlainText(f"cd: no such directory: {target}")
+                return True
+            self._working_dir = str(target)
+            self._working_directory = str(target)
+            return True
+        return False
 
     @staticmethod
     def _shell_command(command: str) -> tuple[str, list[str]]:
@@ -138,6 +176,7 @@ class TerminalPanel(QWidget):
                     self._process.waitForBytesWritten(100)
                 except Exception:
                     pass
+                self._output.start_input()
             except Exception:
                 # fallback: if writing fails, show it as a new command
                 self._run_command(text)
@@ -173,6 +212,7 @@ class TerminalPanel(QWidget):
         self._output.setTextCursor(cursor)
 
     def _handle_finished(self, _exit_code: int, _exit_status) -> None:
+        self._output.stop_input()
         self._output.set_interrupt_enabled(False)
         self._output.appendPlainText("")
         self._process = None
