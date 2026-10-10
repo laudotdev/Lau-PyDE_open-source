@@ -2,7 +2,7 @@
 
 **Lau-PyDE** is a lightweight Python Development Environment (PyDE) built with **Python + PySide6 + Qt**.
 
-> Version: **1.0.0**  
+> Version: **1.1.0**  
 > Platform: **Windows and Linux**  
 > Status: **Open Source**
 
@@ -154,9 +154,9 @@ The benchmark reflects the project's main design goal: **keep the IDE simple and
 
 # Installation
 
-Lau-PyDE v1.0 is currently distributed as an installable Python package from the source repository. A standalone `.exe` or native Linux installer is **not included yet**.
+Lau-PyDE v1.0 is currently distributed as an installable Python package from the source repository. A standalone native Linux installer is **not included yet**.
 
-The recommended installation method is **pipx**, which installs the application into an isolated environment and exposes its command on your `PATH`. This also keeps Lau-PyDE's dependencies separate from the operating system's Python environment.
+The recommended installation method is `.exe` for Windows and **pipx** for Linux, which installs the application into an isolated environment and exposes its command on your `PATH`. This also keeps Lau-PyDE's dependencies separate from the operating system's Python environment.
 
 ## Requirements
 
@@ -531,4 +531,4 @@ This project is open source. See the repository for license information.
 
 ## Credits
 
-Built by **Laurence / ryu.dev**.
+Built by **John Laurence Aramay / ryu.dev**.
