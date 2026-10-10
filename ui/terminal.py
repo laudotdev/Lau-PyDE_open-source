@@ -72,6 +72,11 @@ class TerminalPanel(QWidget):
         working_dir = str(Path(path).expanduser().resolve())
         if not Path(working_dir).is_dir():
             return
+        if working_dir != self._working_dir:
+            if self._process is not None and self._process.state() != QProcess.NotRunning:
+                self.stop()
+            self._output.stop_input()
+            self._output.clear()
         self._working_dir = working_dir
         self._working_directory = working_dir
         self._show_prompt()
@@ -250,7 +255,7 @@ class TerminalPanel(QWidget):
 
         cursor.setCharFormat(green_format)
         cursor.insertText(f"{current_path} $ ")
-        # cursor.insertText("$ ")
+        # # cursor.insertText("$ ")
 
         self._output.setTextCursor(cursor)
         self._output.start_input()
