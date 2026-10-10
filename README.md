@@ -34,6 +34,10 @@ https://github.com/ryuuufynnn/Lau-PyDE_open-source
 - Smart indentation backspace
 - Open, Save, and Save As
 - Unsaved-change protection
+- Automatic matching-pair insertion for braces, parentheses, quotes, and apostrophes
+- Block commenting with `Ctrl+/`
+- `Shift+Tab` removes four spaces from the current or selected lines
+- In-editor search with `Ctrl+F`
 
 ## Project Management
 
@@ -44,6 +48,10 @@ https://github.com/ryuuufynnn/Lau-PyDE_open-source
 - Close Project support
 - Empty project state when no project is open
 - Explorer shows code-issue counts for files with detected problems
+- Project root folder name and icon remain visible after restarting Lau-PyDE
+- Opened project paths are persisted as absolute paths for Linux and Windows
+- Missing or moved saved projects are handled without crashing
+- Explorer hierarchy preserves the project root with nested files and folders
 
 ## Python Runner
 
@@ -55,6 +63,8 @@ https://github.com/ryuuufynnn/Lau-PyDE_open-source
 - Stop a running Python program
 - Displays code issues before execution when diagnostics detect problems
 - Running programs use the project workspace as their working directory
+- Output run control changes between a Play icon and a Stop icon
+- Stop and run controls remain synchronized with the program state
 
 ## Integrated Terminal
 
@@ -64,6 +74,13 @@ https://github.com/ryuuufynnn/Lau-PyDE_open-source
 - Current-path prompt
 - `lau c` clear command
 - Show, minimize, maximize, and restore terminal panel
+- Uses the native shell on Linux and Windows
+- Supports command history with Up/Down navigation
+- Supports persistent `cd` changes within the integrated terminal
+- Supports interactive Python REPL input and `input()` prompts
+- Supports shell commands such as `echo`, `touch`, `mkdir`, and platform-appropriate removal commands
+- Terminal prompts follow the active project folder and avoid stale or duplicate paths
+- Terminal output and copied selections remain usable while commands run
 
 ## User Interface
 
@@ -77,6 +94,12 @@ https://github.com/ryuuufynnn/Lau-PyDE_open-source
 - Restore Layout action
 - Lau-PyDE application icon and logo
 - Recent-project startup behavior
+- Commands Palette is synchronized with implemented enabled shortcuts
+- Common editing shortcuts work across focused widgets: copy, paste, cut, select all, undo, and redo
+- `Ctrl+0` restores the default Explorer, Commands, Output, and Terminal layout
+- Output, Terminal, and Explorer controls use one shared SVG icon set
+- Panel controls keep consistent sizing, padding, spacing, and alignment on Linux and Windows
+- Output orientation can move between bottom and right layouts
 
 ## Installation & Packaging
 
@@ -145,6 +168,14 @@ The recommended installation method is **pipx**, which installs the application 
 > The current pipx installation requires Python 3.10 or newer on the machine used to install pipx.
 
 ## Windows
+
+### Windows installer
+
+Windows users can download **Lau-PyDE-Setup.exe** here:
+
+https://laupyde.online
+
+The installer is the recommended Windows installation method.
 
 ### 1. Install Python
 
@@ -461,9 +492,26 @@ These are intentionally outside the current V1 scope.
 
 ---
 
+# Recent Fixes and Improvements
+
+Recent development updates focused on reliability and consistency across Linux and Windows:
+
+- Fixed recent-project startup ordering so the restored folder is applied after terminal initialization.
+- Fixed terminal prompt duplication, stale home-directory prompts, missing command output, and extra blank lines.
+- Fixed interactive Python input so the REPL banner, prompts, submitted commands, output, and `input()` responses remain separated correctly.
+- Fixed terminal output selection and Ctrl+C copying without losing the highlighted block.
+- Added persistent terminal working-directory behavior for `cd`.
+- Fixed selected-code `Shift+Tab` handling so focus does not move to unrelated controls.
+- Fixed Commands Palette accuracy so unavailable or unregistered shortcuts are not advertised.
+- Added cross-platform focused-widget editing shortcut handling.
+- Fixed Explorer root restoration and stale saved-folder handling.
+- Added complete default-layout restoration through `Ctrl+0`.
+- Replaced mixed Unicode panel glyphs with shared vector icons and standardized panel control alignment.
+- Kept local tests, IDE metadata, virtual environments, caches, and build artifacts out of Git tracking through `.gitignore`.
+
 # Known Limitations
 
-- No standalone Windows installer yet
+- No standalone Windows installer yet (historical note; the current Windows installer is available from https://laupyde.online)
 - No native Linux installer/package for distribution repositories yet
 - No built-in debugger
 - No Git integration
