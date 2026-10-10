@@ -168,11 +168,12 @@ class TerminalPanel(QWidget):
 
     def _ensure_line_break(self) -> None:
         """Keep submitted terminal input separate from subsequent output."""
-        cursor = self._output.textCursor()
-        cursor.movePosition(QTextCursor.End)
         if not self._output.toPlainText().endswith("\n"):
-            cursor.insertText("\n")
-        self._output.setTextCursor(cursor)
+            # appendPlainText creates a real document block/newline, which
+            # is more reliable here than inserting into a moving prompt
+            # cursor while QProcess output is arriving asynchronously.
+            self._output.appendPlainText("")
+        self._output.moveCursor(QTextCursor.End)
 
     def _on_input_submitted(self, text: str) -> None:
         """Handle input submitted by the inline prompt.
