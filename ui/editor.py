@@ -585,7 +585,77 @@ class CodeEditor(QPlainTextEdit):
         cursor.select(QTextCursor.WordUnderCursor)
         return cursor.selectedText()
 
+    def _handle_auto_pairs(self, event) -> bool:
+        pairs = {
+            "(": ")",
+            "[": "]",
+            "{": "}",
+            "'": "'",
+            '"': '"',
+        }
+
+        cursor = self.textCursor()
+        position = cursor.position()
+        document_text = self.toPlainText()
+
+        # Ignore shortcuts such as Ctrl+Z and Ctrl+C.
+        if event.modifiers() & (
+            Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier
+        ):
+            return False
+
+        typed = event.text()
+
+        # Delete both characters when Backspace is pressed between a pair.
+        if event.key() == Qt.Key_Backspace and not cursor.hasSelection():
+            if position > 0 and position < len(document_text):
+                before = document_text[position - 1]
+                after = document_text[position]
+
+                if before in pairs and pairs[before] == after:
+                    cursor.deletePreviousChar()
+                    cursor.deleteChar()
+                    self.setTextCursor(cursor)
+                    return True
+
+            return False
+
+        # Skip an existing closing bracket or quote.
+        if typed in pairs.values() and not cursor.hasSelection():
+            if (
+                position < len(document_text)
+                and document_text[position] == typed
+            ):
+                cursor.movePosition(QTextCursor.Right)
+                self.setTextCursor(cursor)
+                return True
+
+        # Automatically insert matching characters.
+        if typed in pairs:
+            closing = pairs[typed]
+
+            if cursor.hasSelection():
+                selected = cursor.selectedText()
+                start = cursor.selectionStart()
+
+                cursor.insertText(typed + selected + closing)
+                cursor.setPosition(start + 1)
+                cursor.setPosition(
+                    start + 1 + len(selected),
+                    QTextCursor.KeepAnchor,
+                )
+            else:
+                cursor.insertText(typed + closing)
+                cursor.movePosition(QTextCursor.Left)
+
+            self.setTextCursor(cursor)
+            return True
+
+        return False
+
     def keyPressEvent(self, event) -> None:
+        if self._handle_auto_pairs(event):
+            return
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self._handle_auto_indent()
             return
@@ -594,7 +664,91 @@ class CodeEditor(QPlainTextEdit):
             if self._handle_backspace():
                 return
         
-        # super().keyPressEvent(event)
+        """
+        handle tab hihglighting and indentation. If the user presses Tab, we want insert spaces to the next indentation stop (e.g., 4 spaces). If the user presses Shift+Tab, remove spaces up to the previous indentation stop. If the user has a selection, indent or outdent all selected lines.
+        """
+        # Handle Tab / Shift+Tab for indentation
+        if event.key() == Qt.Key_Tab:
+            cursor = self.textCursor()
+
+            if cursor.hasSelection():
+                start = cursor.selectionStart()
+                end = cursor.selectionEnd()
+
+                start_block = self.document().findBlock(start)
+                end_block = self.document().findBlock(end)
+
+                if end == end_block.position():
+                    end_block = end_block.previous()
+
+                cursor.beginEditBlock()
+
+                block = start_block
+                while block.isValid():
+                    line_cursor = QTextCursor(block)
+                    line = block.text()
+
+                    if event.modifiers() & Qt.ShiftModifier:
+                        # Remove up to 4 leading spaces
+                        spaces = len(line) - len(line.lstrip(" "))
+                        remove_count = min(4, spaces)
+
+                        if remove_count:
+                            line_cursor.movePosition(
+                                QTextCursor.StartOfBlock
+                            )
+                            line_cursor.movePosition(
+                                QTextCursor.Right,
+                                QTextCursor.MoveAnchor,
+                                remove_count,
+                            )
+                            line_cursor.movePosition(
+                                QTextCursor.Left,
+                                QTextCursor.KeepAnchor,
+                                remove_count,
+                            )
+                            line_cursor.removeSelectedText()
+                    else:
+                        # Insert 4 spaces at the beginning of each line
+                        line_cursor.movePosition(
+                            QTextCursor.StartOfBlock
+                        )
+                        line_cursor.insertText("    ")
+
+                    if block == end_block:
+                        break
+
+                    block = block.next()
+
+                cursor.endEditBlock()
+                self.setTextCursor(cursor)
+                return
+
+            if event.modifiers() & Qt.ShiftModifier:
+                # Outdent the current line
+                cursor = self.textCursor()
+                line = cursor.block().text()
+                spaces = len(line) - len(line.lstrip(" "))
+                remove_count = min(4, spaces)
+
+                if remove_count:
+                    cursor.movePosition(QTextCursor.StartOfBlock)
+                    cursor.movePosition(
+                        QTextCursor.Right,
+                        QTextCursor.KeepAnchor,
+                        remove_count,
+                    )
+                    cursor.removeSelectedText()
+
+                return
+
+            # No selection: insert spaces to the next indentation stop
+            position = cursor.positionInBlock()
+            indent_size = 4
+            to_insert = indent_size - (position % indent_size)
+            cursor.insertText(" " * to_insert)
+            self.setTextCursor(cursor)
+            return
 
         if (event.key() == Qt.Key_Slash and event.modifiers() & Qt.ControlModifier):
             self.toggle_comment()
@@ -657,6 +811,14 @@ class CodeEditor(QPlainTextEdit):
             # still insert the dot
             super().keyPressEvent(event)
             return
+
+        # Arrow Down: move cursor to the end of the current line
+        if event.key() == Qt.Key_Down:
+            cursor = self.textCursor()
+            cursor.movePosition(QTextCursor.EndOfBlock)
+            self.setTextCursor(cursor)
+            return
+
 
         super().keyPressEvent(event)
 

@@ -44,9 +44,9 @@ class PythonRunner(QObject):
         
         # changed this if-else block on october 1, 2026 arch linux
         if getattr(sys, "frozen", False) and sys.platform == "win32":
-            self.process.start("py", [file_path])
+            self._process.start("py", [file_path])
         else:
-            self.process.start(sys.excutable, [file_path])
+            self._process.start(sys.executable, [file_path])
 
     def stop(self) -> None:
         """Stop the currently running process, if any."""
