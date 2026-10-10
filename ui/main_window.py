@@ -373,11 +373,11 @@ class MainWindow(QMainWindow):
 
         # replace textual Stop with a compact stop icon button
         self._stop_running_button = QPushButton()
-        self._stop_running_button.setToolTip("Stop the running Python program")
-        self._stop_running_button.setEnabled(False)
-        self._stop_running_button.clicked.connect(self.stop_running)
+        self._stop_running_button.setToolTip("Run the current Python file")
+        self._stop_running_button.setEnabled(True)
+        self._stop_running_button.clicked.connect(self._run_or_stop)
         self._stop_running_button.setFixedSize(32, 24)
-        self._stop_running_button.setIcon(panel_icon("stop"))
+        self._stop_running_button.setIcon(panel_icon("play"))
         self._stop_running_button.setIconSize(ICON_SIZE)
         button_style = (
             "QPushButton { border: none; padding: 0px; margin: 0px; "
@@ -1217,6 +1217,12 @@ class MainWindow(QMainWindow):
         self._set_running_controls(True)
         self.statusBar().showMessage("status: running")
 
+    def _run_or_stop(self) -> None:
+        if self._runner.is_running():
+            self.stop_running()
+        else:
+            self.run_file()
+
     def stop_running(self) -> None:
         """Kill the program currently being run from the editor."""
         if not self._runner.is_running():
@@ -1229,7 +1235,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Killed")
 
     def _set_running_controls(self, running: bool) -> None:
-        self._stop_running_button.setEnabled(running)
+        self._stop_running_button.setEnabled(True)
+        self._stop_running_button.setIcon(panel_icon("stop" if running else "play"))
+        self._stop_running_button.setToolTip(
+            "Stop the running Python program" if running
+            else "Run the current Python file"
+        )
         self._stop_running_action.setEnabled(running)
     def _append_error_output(self, text: str) -> None:
         self.output_panel.moveCursor(QTextCursor.End)
