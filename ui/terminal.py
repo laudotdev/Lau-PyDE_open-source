@@ -34,8 +34,10 @@ class TerminalPanel(QWidget):
         self._output.interrupt_requested.connect(self.stop)
 
         title_bar = QWidget()
+        title_bar.setFixedHeight(32)
         title_bar_layout = QHBoxLayout(title_bar)
-        title_bar_layout.setContentsMargins(0, 0, 0, 0)
+        title_bar_layout.setContentsMargins(4, 0, 4, 0)
+        title_bar_layout.setSpacing(0)
         title_bar_layout.addWidget(QLabel("Terminal"))
         title_bar_layout.addStretch()
 
@@ -44,17 +46,18 @@ class TerminalPanel(QWidget):
         maximize_button = QPushButton("▢")
         minimize_button.setToolTip("Minimize terminal")
         maximize_button.setToolTip("Maximize or restore terminal")
-        minimize_button.setFixedWidth(32)
+        minimize_button.setFixedSize(32, 24)
         minimize_button.setCursor(Qt.PointingHandCursor)
-        maximize_button.setFixedWidth(32)
+        maximize_button.setFixedSize(32, 24)
         maximize_button.setCursor(Qt.PointingHandCursor)
         minimize_button.clicked.connect(self.minimize_requested)
         maximize_button.clicked.connect(self.maximize_requested)
         title_bar_layout.addWidget(minimize_button)
         title_bar_layout.addWidget(maximize_button)
         # remove button borders for a cleaner title bar
-        minimize_button.setStyleSheet("border: none; min-height: 24px;")
-        maximize_button.setStyleSheet("border: none; min-height: 24px;")
+        button_style = "border: none; padding: 0px; margin: 0px;"
+        minimize_button.setStyleSheet(button_style)
+        maximize_button.setStyleSheet(button_style)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -98,7 +101,7 @@ class TerminalPanel(QWidget):
             self._show_prompt()
             return
 
-        if command == "lau c":
+        if command == "lau c" or  command == "clear":
             self._output.clear()
             self._show_prompt()
             return

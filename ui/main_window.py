@@ -363,8 +363,10 @@ class MainWindow(QMainWindow):
         output_layout.setContentsMargins(4, 4, 4, 4)
 
         output_title = QWidget()
+        output_title.setFixedHeight(32)
         output_title_layout = QHBoxLayout(output_title)
-        output_title_layout.setContentsMargins(0, 0, 0, 0)
+        output_title_layout.setContentsMargins(4, 0, 4, 0)
+        output_title_layout.setSpacing(0)
         output_title_layout.addWidget(QLabel("Output"))
         output_title_layout.addStretch()
 
@@ -373,7 +375,8 @@ class MainWindow(QMainWindow):
         self._stop_running_button.setToolTip("Stop the running Python program")
         self._stop_running_button.setEnabled(False)
         self._stop_running_button.clicked.connect(self.stop_running)
-        self._stop_running_button.setStyleSheet("border: none; min-height: 24px;")
+        self._stop_running_button.setFixedSize(32, 24)
+        self._stop_running_button.setStyleSheet("border: none; padding: 0px; margin: 0px;")
         self._stop_running_button.setCursor(Qt.PointingHandCursor)
         output_title_layout.addWidget(self._stop_running_button)
 
@@ -381,13 +384,14 @@ class MainWindow(QMainWindow):
         output_maximize_button = QPushButton("▢")
         output_minimize_button.setToolTip("Minimize output and terminal")
         output_maximize_button.setToolTip("Maximize or restore output")
-        output_minimize_button.setFixedWidth(32)
-        output_maximize_button.setFixedWidth(32)
+        output_minimize_button.setFixedSize(32, 24)
+        output_maximize_button.setFixedSize(32, 24)
         output_minimize_button.clicked.connect(self._minimize_bottom_panel)
         output_maximize_button.clicked.connect(lambda: self._maximize_pane("output"))
         # remove button borders for a sleeker look
-        output_minimize_button.setStyleSheet("border: none; min-height: 24px;")
-        output_maximize_button.setStyleSheet("border: none; min-height: 24px;")
+        button_style = "border: none; padding: 0px; margin: 0px;"
+        output_minimize_button.setStyleSheet(button_style)
+        output_maximize_button.setStyleSheet(button_style)
         output_title_layout.addWidget(output_minimize_button)
         output_title_layout.addWidget(output_maximize_button)
 
@@ -405,8 +409,8 @@ class MainWindow(QMainWindow):
         self._output_orientation = "horizontal"  # or 'vertical'
         self._output_orientation_button = QPushButton("⇨")
         self._output_orientation_button.setToolTip("Move output to the right")
-        self._output_orientation_button.setFixedWidth(32)
-        self._output_orientation_button.setStyleSheet("border: none; min-height: 24px;")
+        self._output_orientation_button.setFixedSize(32, 24)
+        self._output_orientation_button.setStyleSheet(button_style)
         self._output_orientation_button.setCursor(Qt.PointingHandCursor)
         self._output_orientation_button.clicked.connect(self._toggle_output_orientation)
         output_title_layout.addWidget(self._output_orientation_button)
