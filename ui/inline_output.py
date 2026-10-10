@@ -7,6 +7,7 @@ class InlineInputOutput(QPlainTextEdit):
 
     input_submitted = Signal(str)
     interrupt_requested = Signal()
+    history_requested = Signal(int)
 
     def __init__(self) -> None:
         super().__init__()
@@ -55,7 +56,7 @@ class InlineInputOutput(QPlainTextEdit):
         if (event.key() == Qt.Key_C
         and event.modifiers() & Qt.ControlModifier):
             
-            if self._interrupt_enabled:
+            if self._interrupt_enabled and not self.textCursor().hasSelection():
                 self.interrupt_requested.emit()
                 return
 
@@ -75,6 +76,10 @@ class InlineInputOutput(QPlainTextEdit):
             cursor.setPosition(self._input_start)
             cursor.setPosition(self._input_end(), QTextCursor.KeepAnchor)
             self.setTextCursor(cursor)
+            return
+
+        if key in (Qt.Key_Up, Qt.Key_Down) and not (event.modifiers() & Qt.ShiftModifier):
+            self.history_requested.emit(-1 if key == Qt.Key_Up else 1)
             return
 
         if key == Qt.Key_Backspace and cursor.position() <= self._input_start:
@@ -113,3 +118,12 @@ class InlineInputOutput(QPlainTextEdit):
 
     def set_interrupt_enabled(self, enabled: bool) -> None:
         self._interrupt_enabled = enabled
+
+    def replace_input(self, text: str) -> None:
+        if self._input_start is None:
+            return
+        cursor = self.textCursor()
+        cursor.setPosition(self._input_start)
+        cursor.setPosition(self._input_end(), QTextCursor.KeepAnchor)
+        cursor.insertText(text)
+        self.setTextCursor(cursor)

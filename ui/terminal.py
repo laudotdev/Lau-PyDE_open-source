@@ -1,4 +1,6 @@
 import re
+import os
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import QProcess, Signal, Qt
@@ -27,6 +29,7 @@ class TerminalPanel(QWidget):
         # route submitted input to a handler that either writes to a
         # running process stdin or starts a new command
         self._output.input_submitted.connect(self._on_input_submitted)
+        self._output.history_requested.connect(self.history_move)
         self._output.interrupt_requested.connect(self.stop)
 
         title_bar = QWidget()
@@ -58,6 +61,8 @@ class TerminalPanel(QWidget):
         layout.addWidget(self._output)
 
         self._process = None
+        self._history: list[str] = []
+        self._history_index = 0
         self._show_prompt()
 
     def set_working_directory(self, path: str) -> None:
@@ -73,6 +78,9 @@ class TerminalPanel(QWidget):
         if not command:
             self._show_prompt()
             return
+
+        self._history.append(command)
+        self._history_index = len(self._history)
 
         if self._process is not None and self._process.state() != QProcess.NotRunning:
             self._output.appendPlainText("(A command is already running, please wait.)")
@@ -92,9 +100,23 @@ class TerminalPanel(QWidget):
         self._process.readyReadStandardOutput.connect(self._handle_output)
         self._process.finished.connect(self._handle_finished)
 
-        # running through the system shell (bash) means pipes, quotes,
-        # and things like `pip --version` behave as the user expects.
-        self._process.start("bash", ["-c", command])
+        # Run through the user's native shell so quoting, pipes, and
+        # shell-builtins behave as expected on each platform.
+        shell, arguments = self._shell_command(command)
+        self._process.start(shell, arguments)
+
+    @staticmethod
+    def _shell_command(command: str) -> tuple[str, list[str]]:
+        if os.name == "nt" or sys.platform == "win32":
+            return os.environ.get("COMSPEC", "cmd.exe"), ["/d", "/s", "/c", command]
+        return os.environ.get("SHELL", "/bin/sh"), ["-c", command]
+
+    def history_move(self, direction: int) -> None:
+        if not self._history:
+            return
+        self._history_index = max(0, min(len(self._history), self._history_index + direction))
+        value = self._history[self._history_index] if self._history_index < len(self._history) else ""
+        self._output.replace_input(value)
 
     def _on_input_submitted(self, text: str) -> None:
         """Handle input submitted by the inline prompt.
