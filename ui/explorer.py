@@ -17,6 +17,7 @@ import subprocess
 import typing
 
 from PySide6.QtCore import Signal, Qt, QModelIndex, QDir, QUrl
+from ui.panel_icons import panel_icon, ICON_SIZE
 from PySide6.QtGui import QColor, QPainter, QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -131,12 +132,16 @@ class FileExplorer(QWidget):
         title_layout.addWidget(QLabel("Explorer"))
         title_layout.addStretch()
 
-        minimize_button = QPushButton("▁")
-        maximize_button = QPushButton("▢")
+        minimize_button = QPushButton()
+        maximize_button = QPushButton()
         minimize_button.setToolTip("Minimize explorer")
         maximize_button.setToolTip("Maximize or restore explorer")
         minimize_button.setFixedSize(32, 24)
+        minimize_button.setIcon(panel_icon("minimize"))
+        minimize_button.setIconSize(ICON_SIZE)
         maximize_button.setFixedSize(32, 24)
+        maximize_button.setIcon(panel_icon("maximize"))
+        maximize_button.setIconSize(ICON_SIZE)
         minimize_button.clicked.connect(self.minimize_requested)
         maximize_button.clicked.connect(self.maximize_requested)
         # remove button borders to match other panels
@@ -178,7 +183,7 @@ class FileExplorer(QWidget):
         self._commands_label.setStyleSheet("font-size: 11px; font-weight: bold;")
         ch_layout.addWidget(self._commands_label)
         ch_layout.addStretch()
-        self._commands_toggle = QPushButton("▁")
+        self._commands_toggle = QPushButton()
         self._commands_toggle.setFixedWidth(28)
         self._commands_toggle.setStyleSheet("border: none; min-height: 20px;")
         self._commands_toggle.setCursor(Qt.PointingHandCursor)

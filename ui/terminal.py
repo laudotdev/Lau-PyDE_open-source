@@ -9,6 +9,7 @@ from PySide6.QtGui import QFont, QTextCursor, QTextCharFormat, QColor
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ui.inline_output import InlineInputOutput
+from ui.panel_icons import panel_icon, ICON_SIZE
 
 
 class TerminalPanel(QWidget):
@@ -42,13 +43,17 @@ class TerminalPanel(QWidget):
         title_bar_layout.addStretch()
 
         # terminal doesn't show a separate stop control (not useful here)
-        minimize_button = QPushButton("▁")
-        maximize_button = QPushButton("▢")
+        minimize_button = QPushButton()
+        maximize_button = QPushButton()
         minimize_button.setToolTip("Minimize terminal")
         maximize_button.setToolTip("Maximize or restore terminal")
         minimize_button.setFixedSize(32, 24)
+        minimize_button.setIcon(panel_icon("minimize"))
+        minimize_button.setIconSize(ICON_SIZE)
         minimize_button.setCursor(Qt.PointingHandCursor)
         maximize_button.setFixedSize(32, 24)
+        maximize_button.setIcon(panel_icon("maximize"))
+        maximize_button.setIconSize(ICON_SIZE)
         maximize_button.setCursor(Qt.PointingHandCursor)
         minimize_button.clicked.connect(self.minimize_requested)
         maximize_button.clicked.connect(self.maximize_requested)

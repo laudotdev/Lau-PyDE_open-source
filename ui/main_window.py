@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     
 )
 from PySide6.QtGui import QShortcut
+from ui.panel_icons import panel_icon, ICON_SIZE
 
 from core.file_manager import read_file, write_file
 from core.file_manager import (
@@ -371,11 +372,13 @@ class MainWindow(QMainWindow):
         output_title_layout.addStretch()
 
         # replace textual Stop with a compact stop icon button
-        self._stop_running_button = QPushButton("⏹")
+        self._stop_running_button = QPushButton()
         self._stop_running_button.setToolTip("Stop the running Python program")
         self._stop_running_button.setEnabled(False)
         self._stop_running_button.clicked.connect(self.stop_running)
         self._stop_running_button.setFixedSize(32, 24)
+        self._stop_running_button.setIcon(panel_icon("stop"))
+        self._stop_running_button.setIconSize(ICON_SIZE)
         button_style = (
             "QPushButton { border: none; padding: 0px; margin: 0px; "
             "font-family: DejaVu Sans, Segoe UI, sans-serif; font-size: 12px; "
@@ -387,12 +390,16 @@ class MainWindow(QMainWindow):
         self._stop_running_button.setCursor(Qt.PointingHandCursor)
         output_title_layout.addWidget(self._stop_running_button)
 
-        output_minimize_button = QPushButton("▁")
-        output_maximize_button = QPushButton("▢")
+        output_minimize_button = QPushButton()
+        output_maximize_button = QPushButton()
         output_minimize_button.setToolTip("Minimize output and terminal")
         output_maximize_button.setToolTip("Maximize or restore output")
         output_minimize_button.setFixedSize(32, 24)
+        output_minimize_button.setIcon(panel_icon("minimize"))
+        output_minimize_button.setIconSize(ICON_SIZE)
         output_maximize_button.setFixedSize(32, 24)
+        output_maximize_button.setIcon(panel_icon("maximize"))
+        output_maximize_button.setIconSize(ICON_SIZE)
         output_minimize_button.clicked.connect(self._minimize_bottom_panel)
         output_maximize_button.clicked.connect(lambda: self._maximize_pane("output"))
         # remove button borders for a sleeker look
@@ -422,9 +429,11 @@ class MainWindow(QMainWindow):
         
         # orientation toggle: switch between bottom (horizontal) and right (vertical)
         self._output_orientation = "horizontal"  # or 'vertical'
-        self._output_orientation_button = QPushButton("⇨")
+        self._output_orientation_button = QPushButton()
         self._output_orientation_button.setToolTip("Move output to the right")
         self._output_orientation_button.setFixedSize(32, 24)
+        self._output_orientation_button.setIcon(panel_icon("orient-right"))
+        self._output_orientation_button.setIconSize(ICON_SIZE)
         self._output_orientation_button.setStyleSheet(button_style)
         self._output_orientation_button.setCursor(Qt.PointingHandCursor)
         self._output_orientation_button.setContentsMargins(0, 0, 0, 0)
