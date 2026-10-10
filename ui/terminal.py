@@ -66,8 +66,13 @@ class TerminalPanel(QWidget):
         self._show_prompt()
 
     def set_working_directory(self, path: str) -> None:
-        self._working_dir = path
-        self._working_directory = path
+        # Keep the prompt and QProcess working directory identical to the
+        # active project, including when a relative path is supplied.
+        working_dir = str(Path(path).expanduser().resolve())
+        if not Path(working_dir).is_dir():
+            return
+        self._working_dir = working_dir
+        self._working_directory = working_dir
         self._show_prompt()
 
     def _run_command(self, command: str) -> None:

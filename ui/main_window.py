@@ -990,6 +990,7 @@ class MainWindow(QMainWindow):
 
         # remove the current project folder from the IDE and set to None
         self.explorer.set_root_folder(None)
+        self.terminal_panel.set_working_directory(str(Path.home()))
 
         if RECENT_PROJECT_FILE.exists():
             try:
@@ -1032,6 +1033,7 @@ class MainWindow(QMainWindow):
 
             if folder and Path(folder).is_dir():
                 self._current_folder = folder
+                self.terminal_panel.set_working_directory(folder)
                 # restore the exact folder as the explorer root and ensure
                 # the explorer shows the project's commands section.
                 self.explorer.set_root_folder(folder)
