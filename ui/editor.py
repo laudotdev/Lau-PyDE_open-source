@@ -586,6 +586,19 @@ class CodeEditor(QPlainTextEdit):
         return cursor.selectedText()
 
     def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            self._handle_auto_indent()
+            return
+
+        if event.key() == Qt.Key_Backspace:
+            if self._handle_backspace():
+                return
+        
+        # super().keyPressEvent(event)
+
+        if (event.key() == Qt.Key_Slash and event.modifiers() & Qt.ControlModifier):
+            self.toggle_comment()
+            return
         # allow auto-indent/backspace handling
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             self._handle_auto_indent()
@@ -810,18 +823,9 @@ class CodeEditor(QPlainTextEdit):
         self.setExtraSelections(selections)
         self._line_number_area.update()
 
-    # auto indentation
-    def keyPressEvent(self, event) -> None:
-        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
-            self._handle_auto_indent()
-            return
-
-        if event.key() == Qt.Key_Backspace:
-            if self._handle_backspace():
-                return
-        
-        super().keyPressEvent(event)
-
+    # # auto indentation
+    # def keyPressEvent(self, event) -> None:
+    #     i
     def contextMenuEvent(self, event) -> None:
         """Show a lightweight context (right-click) menu with common actions."""
         menu = QMenu(self)
@@ -946,3 +950,87 @@ class CodeEditor(QPlainTextEdit):
 
         cursor.insertText("\n" + new_indent)
         self.setTextCursor(cursor)
+    def toggle_comment(self):
+        cursor = self.textCursor()
+
+        start_block = self.document().findBlock(
+            cursor.selectionStart()
+        )
+        end_block = self.document().findBlock(
+            cursor.selectionEnd()
+        )
+
+        # If the selection ends at the beginning of a line,
+        # don't include that final line.
+        if (
+            cursor.hasSelection()
+            and cursor.selectionEnd() == end_block.position()
+        ):
+            end_block = end_block.previous()
+
+        # Determine whether all non-empty lines are commented.
+        blocks = []
+        block = start_block
+
+        while block.isValid():
+            blocks.append(block)
+
+            if block == end_block:
+                break
+
+            block = block.next()
+
+        non_empty_lines = [
+            block.text() for block in blocks if block.text().strip()
+        ]
+
+        uncomment = bool(non_empty_lines) and all(
+            line.lstrip().startswith("#")
+            for line in non_empty_lines
+        )
+
+        cursor.beginEditBlock()
+
+        for block in blocks:
+            line = block.text()
+
+            if not line.strip():
+                continue
+
+            line_cursor = QTextCursor(block)
+            line_cursor.movePosition(QTextCursor.StartOfBlock)
+
+            if uncomment:
+                # Remove the comment marker and one optional space.
+                stripped = line.lstrip()
+                indent = len(line) - len(stripped)
+                line_cursor.movePosition(
+                    QTextCursor.Right,
+                    QTextCursor.MoveAnchor,
+                    indent,
+                )
+                line_cursor.deleteChar()  # Remove '#'
+
+                if line_cursor.block().text()[
+                    line_cursor.positionInBlock():
+                ].startswith(" "):
+                    line_cursor.deleteChar()
+            else:
+                # Insert the comment marker after indentation.
+                indent = len(line) - len(line.lstrip())
+                line_cursor.movePosition(
+                    QTextCursor.Right,
+                    QTextCursor.MoveAnchor,
+                    indent,
+                )
+                line_cursor.insertText("# ")
+
+        cursor.endEditBlock()
+
+        # Keep the affected lines selected.
+        selection = QTextCursor(start_block)
+        selection.setPosition(
+            blocks[-1].position() + blocks[-1].length() - 1,
+            QTextCursor.KeepAnchor,
+        )
+        self.setTextCursor(selection)
