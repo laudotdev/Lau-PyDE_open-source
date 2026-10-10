@@ -466,6 +466,11 @@ class FileExplorer(QWidget):
 
         menu.exec(self._tree.viewport().mapToGlobal(pos))
 
+    def restore_commands_section(self) -> None:
+        """Show the Commands section when a project workspace is open."""
+        if self._project_root and not self._commands_section.isVisible():
+            self._toggle_commands_section()
+
     def _toggle_commands_section(self) -> None:
         try:
             if self._commands_section.isVisible():

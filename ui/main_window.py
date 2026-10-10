@@ -677,7 +677,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(show_terminal_action)
 
         # action to show/hide commands list in explorer
-        show_commands_list_action = QAction("Show Commands List", self)
+        show_commands_list_action = QAction("Show Key Shortcuts", self)
         show_commands_list_action.setCheckable(True)
         show_commands_list_action.setChecked(self.explorer._commands_section.isVisible())
 
@@ -699,7 +699,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(show_commands_list_action)
 
         restore_layout_action = QAction("Restore Layout", self)
-        restore_layout_action.triggered.connect(self._restore_layout)
+        restore_layout_action.triggered.connect(self._restore_default_layout)
         restore_layout_action.setShortcut(QKeySequence("Ctrl+0"))
         view_menu.addAction(restore_layout_action)
 
@@ -1331,6 +1331,18 @@ class MainWindow(QMainWindow):
             self._main_splitter.setSizes([0, self.width()])
             if pane == "terminal":
                 self.terminal_panel.focus_input()
+
+    def _restore_default_layout(self) -> None:
+        """Restore every user-collapsible panel to the default layout."""
+        self._explorer_minimized = False
+        self._bottom_minimized = False
+        self._maximized_pane = None
+        self._restore_layout()
+        self.explorer.show()
+        try:
+            self.explorer.restore_commands_section()
+        except AttributeError:
+            pass
 
     def _restore_layout(self) -> None:
         self._maximized_pane = None
