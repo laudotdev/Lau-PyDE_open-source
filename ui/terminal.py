@@ -233,7 +233,7 @@ class TerminalPanel(QWidget):
         format_.setForeground(QColor("#ff0000") if error_pattern.search(text) else QColor("#00ff00"))
         cursor = self._output.textCursor()
         cursor.movePosition(QTextCursor.End)
-        # cursor.insertText(text, format_)
+        cursor.insertText(text, format_)
         self._output.setTextCursor(cursor)
         if self._process is not None and self._process.state() != QProcess.NotRunning:
             self._output.start_input()
@@ -248,6 +248,9 @@ class TerminalPanel(QWidget):
         current_path = self._working_dir
 
         cursor = self._output.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        if self._output.toPlainText() and not self._output.toPlainText().endswith("\n"):
+            cursor.insertBlock()
         green_format = QTextCharFormat()
         green_format.setForeground(QColor("#00ff00"))
 
