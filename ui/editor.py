@@ -668,7 +668,7 @@ class CodeEditor(QPlainTextEdit):
         handle tab hihglighting and indentation. If the user presses Tab, we want insert spaces to the next indentation stop (e.g., 4 spaces). If the user presses Shift+Tab, remove spaces up to the previous indentation stop. If the user has a selection, indent or outdent all selected lines.
         """
         # Handle Tab / Shift+Tab for indentation
-        if event.key() == Qt.Key_Tab:
+        if event.key() in (Qt.Key_Tab, Qt.Key_Backtab):
             cursor = self.textCursor()
 
             if cursor.hasSelection():

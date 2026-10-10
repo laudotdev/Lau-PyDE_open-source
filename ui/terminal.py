@@ -150,6 +150,11 @@ class TerminalPanel(QWidget):
 
     @staticmethod
     def _shell_command(command: str) -> tuple[str, list[str]]:
+        # Python disables its REPL prompt when stdin is a pipe. Explicitly
+        # request interactive mode so `python` works with QProcess stdin.
+        stripped = command.strip()
+        if stripped in {"python", "python3", "py"}:
+            command = f"{stripped} -i"
         if os.name == "nt" or sys.platform == "win32":
             return os.environ.get("COMSPEC", "cmd.exe"), ["/d", "/s", "/c", command]
         return os.environ.get("SHELL", "/bin/sh"), ["-c", command]
