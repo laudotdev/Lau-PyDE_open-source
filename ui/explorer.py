@@ -165,7 +165,7 @@ class FileExplorer(QWidget):
         ch_layout = QHBoxLayout(self._commands_header)
         ch_layout.setContentsMargins(0, 0, 0, 0)
         ch_layout.setSpacing(4)
-        self._commands_label = QLabel("Commands")
+        self._commands_label = QLabel("Key Shortcuts")
         self._commands_label.setStyleSheet("font-size: 11px; font-weight: bold;")
         ch_layout.addWidget(self._commands_label)
         ch_layout.addStretch()

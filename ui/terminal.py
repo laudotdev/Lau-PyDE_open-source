@@ -255,7 +255,7 @@ class TerminalPanel(QWidget):
         green_format.setForeground(QColor("#00ff00"))
 
         cursor.setCharFormat(green_format)
-        cursor.insertText(f"{current_path} $ ")
+        cursor.insertText(f"[{current_path}] $ ")
         # # cursor.insertText("$ ")
 
         self._output.setTextCursor(cursor)
