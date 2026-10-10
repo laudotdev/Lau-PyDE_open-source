@@ -972,6 +972,7 @@ class MainWindow(QMainWindow):
         if folder:
             # self._current_folder = folder
             # # self.explorer.set_root_folder(folder)
+            folder = str(Path(folder).expanduser().resolve())
             self.terminal_panel.set_working_directory(folder)
             # self.statusBar().showMessage(f"Workspace: {folder}")
             self._current_folder = folder
@@ -1040,23 +1041,14 @@ class MainWindow(QMainWindow):
             folder = data.get("project")
 
             if folder and Path(folder).is_dir():
+                folder = str(Path(folder).expanduser().resolve())
                 self._current_folder = folder
                 self.terminal_panel.set_working_directory(folder)
-                # restore the exact folder as the explorer root and ensure
-                # the explorer shows the project's commands section.
+                # set_root_folder deliberately uses the parent as the tree
+                # root so the project folder itself remains visible with its
+                # folder icon and contents nested beneath it. Do not replace
+                # that index with the project folder here.
                 self.explorer.set_root_folder(folder)
-                try:
-                    # prefer showing the project folder itself as the tree root
-                    idx = self.explorer._model.index(str(folder))
-                    if idx.isValid():
-                        self.explorer._tree.setRootIndex(idx)
-                        try:
-                            self.explorer._tree.expand(idx)
-                            self.explorer._tree.setCurrentIndex(idx)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
                 try:
                     # ensure commands section is visible and layout is restored
                     try:
@@ -1075,6 +1067,17 @@ class MainWindow(QMainWindow):
 
                 if file_path and Path(file_path).is_file():
                     self.open_file(file_path)
+            elif folder:
+                # Clear stale persistence when the project was moved or
+                # deleted; the next Open Folder action can then proceed
+                # normally.
+                try:
+                    RECENT_PROJECT_FILE.unlink()
+                except OSError:
+                    pass
+                self.statusBar().showMessage(
+                    f"Project folder no longer exists: {folder}"
+                )
                 
         except (json.JSONDecodeError, OSError):
             pass
