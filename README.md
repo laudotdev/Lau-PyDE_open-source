@@ -177,7 +177,7 @@ https://laupyde.online
 
 The installer is the recommended Windows installation method.
 
-### 1. Install Python
+### Install Python
 
 Install Python from:
 
@@ -188,46 +188,6 @@ Check it:
 ```powershell
 py --version
 ```
-
-### 2. Install pipx
-
-```powershell
-py -m pip install --user pipx
-py -m pipx ensurepath
-```
-
-Restart the terminal after `ensurepath` so the PATH change takes effect.
-
-Check pipx:
-
-```powershell
-pipx --version
-```
-
-### 3. Clone Lau-PyDE
-
-```powershell
-git clone https://github.com/ryuuufynnn/Lau-PyDE_open-source.git
-cd Lau-PyDE_open-source
-```
-
-You can also download the repository ZIP from GitHub and extract it.
-
-### 4. Install Lau-PyDE
-
-```powershell
-pipx install .
-```
-
-### 5. Run Lau-PyDE
-
-Use the installed command:
-
-```powershell
-pyde lau
-```
-
-The command can be run from the project directory or from another directory after installation.
 
 ---
 
