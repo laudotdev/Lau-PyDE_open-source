@@ -29,7 +29,7 @@ class InlineInputOutput(QPlainTextEdit):
         cursor.movePosition(QTextCursor.End)
 
         # conditional para if user input ang code ay magkakaroon ng \n 
-        if self._input_start is not None:
+        if self._input_start is not None and self._input_text():
             cursor.insertText("\n")
 
         self.setTextCursor(cursor)
