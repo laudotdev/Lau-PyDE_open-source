@@ -229,7 +229,7 @@ class TerminalPanel(QWidget):
         format_.setForeground(QColor("#ff0000") if error_pattern.search(text) else QColor("#00ff00"))
         cursor = self._output.textCursor()
         cursor.movePosition(QTextCursor.End)
-        cursor.insertText(text, format_)
+        # cursor.insertText(text, format_)
         self._output.setTextCursor(cursor)
         if self._process is not None and self._process.state() != QProcess.NotRunning:
             self._output.start_input()
@@ -249,8 +249,8 @@ class TerminalPanel(QWidget):
         green_format.setForeground(QColor("#00ff00"))
 
         cursor.setCharFormat(green_format)
-        cursor.insertText(f"{current_path}\n")
-        cursor.insertText("$ ")
+        cursor.insertText(f"{current_path} $ ")
+        # cursor.insertText("$ ")
 
         self._output.setTextCursor(cursor)
         self._output.start_input()
