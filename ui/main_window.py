@@ -1403,7 +1403,7 @@ class MainWindow(QMainWindow):
 
         # update icon and tooltip
         if new == "vertical":
-            self._output_orientation_button.setText("⇦")
+            self._output_orientation_button.setIcon(panel_icon("orient-left"))
             self._output_orientation_button.setToolTip("Move output to bottom")
             # switch splitter orientation to horizontal (editor left, output right)
             try:
@@ -1411,7 +1411,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         else:
-            self._output_orientation_button.setText("⇨")
+            self._output_orientation_button.setIcon(panel_icon("orient-right"))
             self._output_orientation_button.setToolTip("Move output to the right")
             # switch splitter orientation to vertical (editor top, output bottom)
             try:
