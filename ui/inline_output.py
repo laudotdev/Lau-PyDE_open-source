@@ -125,6 +125,11 @@ class InlineInputOutput(QPlainTextEdit):
     def set_interrupt_enabled(self, enabled: bool) -> None:
         self._interrupt_enabled = enabled
 
+    def suspend_input(self) -> None:
+        """Protect existing output without adding a newline."""
+        self._input_start = None
+        self.setReadOnly(True)
+
     def replace_input(self, text: str) -> None:
         if self._input_start is None:
             return

@@ -203,6 +203,11 @@ class TerminalPanel(QWidget):
     def _handle_output(self) -> None:
         data = self._process.readAllStandardOutput()
         text = bytes(data).decode("utf-8", errors="replace")
+        # QProcess output can arrive immediately after starting an
+        # interactive program. Do not let the startup banner become part
+        # of the editable stdin buffer.
+        if self._output._input_start is not None and not self._output._input_text():
+            self._output.suspend_input()
         self._output.moveCursor(QTextCursor.End)
 
         error_pattern = re.compile(
@@ -215,6 +220,8 @@ class TerminalPanel(QWidget):
         cursor.movePosition(QTextCursor.End)
         cursor.insertText(text, format_)
         self._output.setTextCursor(cursor)
+        if self._process is not None and self._process.state() != QProcess.NotRunning:
+            self._output.start_input()
 
     def _handle_finished(self, _exit_code: int, _exit_status) -> None:
         self._output.stop_input()
