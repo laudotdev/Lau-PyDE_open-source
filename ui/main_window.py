@@ -574,36 +574,42 @@ class MainWindow(QMainWindow):
 
         undo_action = QAction("Undo", self)
         undo_action.setShortcut(QKeySequence.Undo)
-        undo_action.triggered.connect(self.editor.undo)
+        undo_action.setShortcutContext(Qt.ApplicationShortcut)
+        undo_action.triggered.connect(lambda: self._edit_action("undo"))
         edit_menu.addAction(undo_action)
 
         redo_action = QAction("Redo", self)
         redo_action.setShortcut(QKeySequence("Ctrl+Y"))
-        redo_action.triggered.connect(self.editor.redo)
+        redo_action.setShortcutContext(Qt.ApplicationShortcut)
+        redo_action.triggered.connect(lambda: self._edit_action("redo"))
         edit_menu.addAction(redo_action)
 
         edit_menu.addSeparator()
 
         cut_action = QAction("Cut", self)
         cut_action.setShortcut(QKeySequence.Cut)
-        cut_action.triggered.connect(self.editor.cut)
+        cut_action.setShortcutContext(Qt.ApplicationShortcut)
+        cut_action.triggered.connect(lambda: self._edit_action("cut"))
         edit_menu.addAction(cut_action)
 
         copy_action = QAction("Copy", self)
         copy_action.setShortcut(QKeySequence.Copy)
-        copy_action.triggered.connect(self.editor.copy)
+        copy_action.setShortcutContext(Qt.ApplicationShortcut)
+        copy_action.triggered.connect(lambda: self._edit_action("copy"))
         edit_menu.addAction(copy_action)
 
         paste_action = QAction("Paste", self)
         paste_action.setShortcut(QKeySequence.Paste)
-        paste_action.triggered.connect(self.editor.paste)
+        paste_action.setShortcutContext(Qt.ApplicationShortcut)
+        paste_action.triggered.connect(lambda: self._edit_action("paste"))
         edit_menu.addAction(paste_action)
 
         edit_menu.addSeparator()
 
         select_all_action = QAction("Select All", self)
         select_all_action.setShortcut(QKeySequence.SelectAll)
-        select_all_action.triggered.connect(self.editor.selectAll)
+        select_all_action.setShortcutContext(Qt.ApplicationShortcut)
+        select_all_action.triggered.connect(lambda: self._edit_action("selectAll"))
         edit_menu.addAction(select_all_action)
 
         # run menu
@@ -705,6 +711,16 @@ class MainWindow(QMainWindow):
                 self.explorer.populate_commands(self)
         except Exception:
             pass
+
+    def _edit_action(self, operation: str) -> None:
+        widget = self.focusWidget()
+        while widget is not None:
+            method = getattr(widget, operation, None)
+            if callable(method):
+                method()
+                return
+            widget = widget.parentWidget()
+        getattr(self.editor, operation)()
 
     # file operations
     def _project_root(self) -> Path:

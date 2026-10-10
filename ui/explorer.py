@@ -587,8 +587,9 @@ class FileExplorer(QWidget):
                 except Exception:
                     shortcut = ""
 
-                if txt:
-                    # normalize displayed text (remove trailing ellipses)
+                if txt and shortcut and act.isEnabled():
+                    # The palette is a shortcut index, so only advertise
+                    # enabled actions with an actual registered shortcut.
                     display = txt.replace('&', '').strip()
                     found.append((display, shortcut))
                 # recurse into submenus
@@ -616,7 +617,7 @@ class FileExplorer(QWidget):
                     shortcut = act.shortcut().toString()
                 except Exception:
                     continue
-                if txt:
+                if txt and shortcut and act.isEnabled():
                     found.append((txt.replace('&', '').strip(), shortcut))
 
         # dedupe while preserving order
