@@ -80,7 +80,7 @@ class TerminalPanel(QWidget):
         command = command.strip()
         self._output.stop_input()
         self._output.moveCursor(QTextCursor.End)
-        # self._output.insertPlainText("\n")
+        self._ensure_line_break()
         if not command:
             self._show_prompt()
             return
@@ -165,6 +165,14 @@ class TerminalPanel(QWidget):
         self._history_index = max(0, min(len(self._history), self._history_index + direction))
         value = self._history[self._history_index] if self._history_index < len(self._history) else ""
         self._output.replace_input(value)
+
+    def _ensure_line_break(self) -> None:
+        """Keep submitted terminal input separate from subsequent output."""
+        cursor = self._output.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        if not self._output.toPlainText().endswith("\n"):
+            cursor.insertText("\n")
+        self._output.setTextCursor(cursor)
 
     def _on_input_submitted(self, text: str) -> None:
         """Handle input submitted by the inline prompt.
