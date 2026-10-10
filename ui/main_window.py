@@ -376,7 +376,14 @@ class MainWindow(QMainWindow):
         self._stop_running_button.setEnabled(False)
         self._stop_running_button.clicked.connect(self.stop_running)
         self._stop_running_button.setFixedSize(32, 24)
-        self._stop_running_button.setStyleSheet("border: none; padding: 0px; margin: 0px;")
+        button_style = (
+            "QPushButton { border: none; padding: 0px; margin: 0px; "
+            "font-family: DejaVu Sans, Segoe UI, sans-serif; font-size: 12px; "
+            "font-weight: normal; }"
+        )
+        self._stop_running_button.setStyleSheet(button_style)
+        self._stop_running_button.setCursor(Qt.PointingHandCursor)
+        self._stop_running_button.setContentsMargins(0, 0, 0, 0)
         self._stop_running_button.setCursor(Qt.PointingHandCursor)
         output_title_layout.addWidget(self._stop_running_button)
 
@@ -389,9 +396,17 @@ class MainWindow(QMainWindow):
         output_minimize_button.clicked.connect(self._minimize_bottom_panel)
         output_maximize_button.clicked.connect(lambda: self._maximize_pane("output"))
         # remove button borders for a sleeker look
-        button_style = "border: none; padding: 0px; margin: 0px;"
+        button_style = (
+            "QPushButton { border: none; padding: 0px; margin: 0px; "
+            "font-family: DejaVu Sans, Segoe UI, sans-serif; font-size: 12px; "
+            "font-weight: normal; }"
+        )
         output_minimize_button.setStyleSheet(button_style)
+        output_minimize_button.setCursor(Qt.PointingHandCursor)
+        output_minimize_button.setContentsMargins(0, 0, 0, 0)
         output_maximize_button.setStyleSheet(button_style)
+        output_maximize_button.setCursor(Qt.PointingHandCursor)
+        output_maximize_button.setContentsMargins(0, 0, 0, 0)
         output_title_layout.addWidget(output_minimize_button)
         output_title_layout.addWidget(output_maximize_button)
 
@@ -410,6 +425,9 @@ class MainWindow(QMainWindow):
         self._output_orientation_button = QPushButton("⇨")
         self._output_orientation_button.setToolTip("Move output to the right")
         self._output_orientation_button.setFixedSize(32, 24)
+        self._output_orientation_button.setStyleSheet(button_style)
+        self._output_orientation_button.setCursor(Qt.PointingHandCursor)
+        self._output_orientation_button.setContentsMargins(0, 0, 0, 0)
         self._output_orientation_button.setStyleSheet(button_style)
         self._output_orientation_button.setCursor(Qt.PointingHandCursor)
         self._output_orientation_button.clicked.connect(self._toggle_output_orientation)

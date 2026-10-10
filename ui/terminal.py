@@ -55,9 +55,17 @@ class TerminalPanel(QWidget):
         title_bar_layout.addWidget(minimize_button)
         title_bar_layout.addWidget(maximize_button)
         # remove button borders for a cleaner title bar
-        button_style = "border: none; padding: 0px; margin: 0px;"
+        button_style = (
+            "QPushButton { border: none; padding: 0px; margin: 0px; "
+            "font-family: DejaVu Sans, Segoe UI, sans-serif; font-size: 12px; "
+            "font-weight: normal; }"
+        )
         minimize_button.setStyleSheet(button_style)
+        minimize_button.setCursor(Qt.PointingHandCursor)
+        minimize_button.setContentsMargins(0, 0, 0, 0)
         maximize_button.setStyleSheet(button_style)
+        maximize_button.setCursor(Qt.PointingHandCursor)
+        maximize_button.setContentsMargins(0, 0, 0, 0)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
