@@ -282,7 +282,6 @@ class MainWindow(QMainWindow):
         self._search_matches: list[QTextCursor] = []
         self._search_index: int = -1
 
-        self.load_recent_project()
         self.explorer.file_double_clicked.connect(self.open_file)
 
         self.output_panel = InlineInputOutput()
@@ -295,6 +294,10 @@ class MainWindow(QMainWindow):
         self.terminal_panel.maximize_requested.connect(
             lambda: self._maximize_pane("terminal")
         )
+
+        # Restore the recent workspace only after the terminal exists,
+        # because restoration also sets its working directory.
+        self.load_recent_project()
 
         self.explorer.minimize_requested.connect(self._minimize_explorer)
         self.explorer.maximize_requested.connect(lambda: self._maximize_pane("explorer"))
