@@ -2,7 +2,7 @@ import ast
 import difflib
 import tokenize
 from io import StringIO
-from PySide6.QtCore import QRect, QRegularExpression, QSize, Qt, Signal
+from PySide6.QtCore import QRect, QRegularExpression, QSize, Qt, Signal, QTimer, QPoint, QEvent
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -197,6 +197,7 @@ class CodeEditor(QPlainTextEdit):
         self._completer.setWidget(self)
         self._completer.setCompletionMode(QCompleter.PopupCompletion)
         self._completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self._completer.popup().installEventFilter(self)
 
         # now safe to connect textChanged
         self.textChanged.connect(self._check_errors)
@@ -665,7 +666,52 @@ class CodeEditor(QPlainTextEdit):
 
         return False
 
+    def eventFilter(self, watched, event) -> bool:
+        if hasattr(self, "_completer") and watched is self._completer.popup():
+            if event.type() == QEvent.Show:
+                QTimer.singleShot(0, self._center_completion_popup)
+            elif event.type() == QEvent.KeyPress and event.key() == Qt.Key_Tab:
+                if self._accept_completion():
+                    return True
+        return super().eventFilter(watched, event)
+
+    def _center_completion_popup(self) -> None:
+        popup = self._completer.popup()
+        if not popup.isVisible():
+            return
+        popup.adjustSize()
+        height = popup.sizeHint().height()
+        top = max(0, (self.viewport().height() - height) // 2)
+        left = max(0, self.cursorRect().left())
+        popup.move(self.viewport().mapToGlobal(QPoint(left, top)))
+
+    def _show_completion(self) -> None:
+        """Show completion centered on the cursor using the same geometry on all platforms."""
+        self._completer.complete()
+
+        popup = self._completer.popup()
+        if popup.currentIndex().row() < 0 and popup.model().rowCount() > 0:
+            popup.setCurrentIndex(popup.model().index(0, 0))
+        QTimer.singleShot(10, self._center_completion_popup)
+
+    def _accept_completion(self) -> bool:
+        popup = self._completer.popup()
+        if not popup.isVisible():
+            return False
+        value = popup.currentIndex().data()
+        if not value:
+            return False
+        cursor = self.textCursor()
+        cursor.select(QTextCursor.WordUnderCursor)
+        cursor.insertText(str(value))
+        self.setTextCursor(cursor)
+        popup.hide()
+        return True
+
     def keyPressEvent(self, event) -> None:
+        if event.key() in (Qt.Key_Tab, Qt.Key_Backtab) and not (event.modifiers() & Qt.ShiftModifier):
+            if self._accept_completion():
+                return
         if self._handle_auto_pairs(event):
             return
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
@@ -786,7 +832,7 @@ class CodeEditor(QPlainTextEdit):
             prefix = self._word_under_cursor()
             try:
                 self._completer.setCompletionPrefix(prefix)
-                self._completer.complete()
+                self._show_completion()
             except Exception:
                 pass
             return
@@ -809,12 +855,19 @@ class CodeEditor(QPlainTextEdit):
                 if attrs:
                     self._completion_model.setStringList(sorted(attrs))
                     self._completer.setCompletionPrefix('')
-                    self._completer.complete()
+                    self._show_completion()
             except Exception:
                 pass
             # still insert the dot
             super().keyPressEvent(event)
             return
+
+        if event.key() == Qt.Key_Down:
+            cursor = self.textCursor()
+            if not cursor.block().next().isValid():
+                cursor.movePosition(QTextCursor.EndOfBlock)
+                self.setTextCursor(cursor)
+                return
 
         super().keyPressEvent(event)
 
@@ -825,7 +878,7 @@ class CodeEditor(QPlainTextEdit):
             if prefix:
                 try:
                     self._completer.setCompletionPrefix(prefix)
-                    self._completer.complete()
+                    self._show_completion()
                 except Exception:
                     pass
 
