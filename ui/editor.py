@@ -166,6 +166,7 @@ class CodeEditor(QPlainTextEdit):
         self._syntax_errors = []
         self._keyword_errors = []
         self._name_errors = []
+        self._parse_error_message: str | None = None
 
         # Code editors traditionally scroll sideways rather than wrap.
         self.setLineWrapMode(QPlainTextEdit.NoWrap)
@@ -206,12 +207,15 @@ class CodeEditor(QPlainTextEdit):
 
         messages: list[str] = []
 
-        for line, start, end in self._syntax_errors:
+        for index, (line, start, end) in enumerate(self._syntax_errors):
             block = self.document().findBlockByLineNumber(line - 1)
             if not block.isValid():
                 messages.append(f"Line {line}: Syntax error.")
                 continue
             text = block.text().strip()
+            if self._parse_error_message and index == 0:
+                messages.append(f"Line {line}: {self._parse_error_message}")
+                continue
             if not text:
                 messages.append(f"Line {line}: Syntax error.")
                 continue
@@ -347,17 +351,22 @@ class CodeEditor(QPlainTextEdit):
         self._syntax_errors = []
         self._keyword_errors = []
         self._name_errors = []
+        self._parse_error_message = None
         seen_syntax = set()
         seen_keyword = set()
         seen_name = set()
 
         try:
             list(tokenize.generate_tokens(StringIO(code).readline))
-        except tokenize.TokenError as error:
+        except (tokenize.TokenError, IndentationError) as error:
             message, location = error.args
 
-            if location:
-                line, column = location
+            if isinstance(error, IndentationError):
+                line = error.lineno or 1
+                column = error.offset or 0
+                item = (line, column + 1, column + 2)
+            elif location:
+                line, column = location[0], location[1]
                 item = (line, column + 1, column + 2)
                 if item not in seen_syntax:
                     self._syntax_errors.append(item)
@@ -367,7 +376,7 @@ class CodeEditor(QPlainTextEdit):
 
         try:
             tokens = list(tokenize.generate_tokens(StringIO(code).readline))
-        except tokenize.TokenError:
+        except (tokenize.TokenError, IndentationError):
             pass
 
         at_statement_start = True
@@ -476,6 +485,9 @@ class CodeEditor(QPlainTextEdit):
                 except Exception:
                     pass
         except SyntaxError as error:
+            if isinstance(error, IndentationError):
+                detail = str(error).strip() or "unexpected indentation"
+                self._parse_error_message = f"IndentationError: {detail}"
             if error.lineno is not None and error.offset is not None:
                 start = error.offset
                 end = getattr(error, "end_offset", None)
@@ -803,14 +815,6 @@ class CodeEditor(QPlainTextEdit):
             # still insert the dot
             super().keyPressEvent(event)
             return
-
-        # Arrow Down: move cursor to the end of the current line
-        if event.key() == Qt.Key_Down:
-            cursor = self.textCursor()
-            cursor.movePosition(QTextCursor.EndOfBlock)
-            self.setTextCursor(cursor)
-            return
-
 
         super().keyPressEvent(event)
 
