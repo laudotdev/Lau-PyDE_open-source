@@ -187,6 +187,7 @@ class CodeEditor(QPlainTextEdit):
         # Code editors traditionally scroll sideways rather than wrap.
         self.setLineWrapMode(QPlainTextEdit.NoWrap)
         self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(" "))
+        self._line_number_mode = "absolute"
 
         self._line_number_area = LineNumberArea(self)
 
@@ -905,6 +906,19 @@ class CodeEditor(QPlainTextEdit):
                     pass
 
     # line number gutter
+    def set_line_number_mode(self, mode: str) -> None:
+        if mode not in {"absolute", "relative", "hybrid"}:
+            raise ValueError(f"Unknown line-number mode: {mode}")
+        self._line_number_mode = mode
+        self._line_number_area.update()
+
+    def line_number_for(self, line_number: int, current_line: int) -> int:
+        if self._line_number_mode == "relative":
+            return abs(line_number - current_line)
+        if self._line_number_mode == "hybrid":
+            return line_number if line_number == current_line else abs(line_number - current_line)
+        return line_number
+
     def line_number_area_width(self) -> int:
         digits = len(str(max(1, self.blockCount())))
         return 12 + self.fontMetrics().horizontalAdvance("9") * digits
@@ -939,7 +953,9 @@ class CodeEditor(QPlainTextEdit):
 
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
-                line_number = block_number + 1
+                absolute_line = block_number + 1
+                current_line = self.textCursor().blockNumber() + 1
+                line_number = self.line_number_for(absolute_line, current_line)
                 painter.setPen(QColor("#f44747" if line_number in error_lines else "#858585"))
                 painter.drawText(
                     0, int(top), self._line_number_area.width() - 6, self.fontMetrics().height(),

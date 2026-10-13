@@ -7,7 +7,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QAction, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
+from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
 from PySide6.QtWidgets import QTextEdit
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -725,14 +725,33 @@ class MainWindow(QMainWindow):
 
         # line numbers
         line_numbers_menu = menu_bar.addMenu("&Line Numbers")
+        line_number_group = QActionGroup(self)
+        line_number_group.setExclusive(True)
 
-        increment_line_number_action = QAction("Increment Line Numbers (default)", self)
-        pass
+        increment_line_number_action = QAction("Absolute Line Numbers", self)
+        increment_line_number_action.setCheckable(True)
+        increment_line_number_action.setChecked(True)
+        increment_line_number_action.triggered.connect(
+            lambda: self.editor.set_line_number_mode("absolute")
+        )
+        line_number_group.addAction(increment_line_number_action)
         line_numbers_menu.addAction(increment_line_number_action)
 
-        relative_line_numbers_action = QAction("Relative Line Numbers (advanced)", self)
-        pass
+        relative_line_numbers_action = QAction("Relative Line Numbers", self)
+        relative_line_numbers_action.setCheckable(True)
+        relative_line_numbers_action.triggered.connect(
+            lambda: self.editor.set_line_number_mode("relative")
+        )
+        line_number_group.addAction(relative_line_numbers_action)
         line_numbers_menu.addAction(relative_line_numbers_action)
+
+        hybrid_line_numbers_action = QAction("Hybrid Line Numbers (Neovim)", self)
+        hybrid_line_numbers_action.setCheckable(True)
+        hybrid_line_numbers_action.triggered.connect(
+            lambda: self.editor.set_line_number_mode("hybrid")
+        )
+        line_number_group.addAction(hybrid_line_numbers_action)
+        line_numbers_menu.addAction(hybrid_line_numbers_action)
 
         # Git actions (Feature 9): interactive push which may prompt for credentials
         git_menu = menu_bar.addMenu("&Git")
