@@ -36,7 +36,7 @@ PYTHON_BUILTINS = [
 # Small, static attribute lists for common modules to provide attribute completions
 MODULE_ATTRS = {
     "os": [
-        "listdir", "path", "getcwd", "chdir", "mkdir", "makedirs", "remove", "relaure",
+        "listdir", "path", "getcwd", "chdir", "mkdir", "makedirs", "remove", "rename",
     ],
     "sys": ["argv", "exit", "path", "stdin", "stdout", "stderr"],
     "math": ["sqrt", "sin", "cos", "tan", "pi", "e"],
@@ -74,13 +74,13 @@ class PythonHighlighter(QSyntaxHighlighter):
         for word in PYTHON_BUILTINS:
             self._rules.append((QRegularExpression(rf"\b{word}\b"), builtin_format))
 
-        # def/class laure — highlight just the captured laure (group 1),
+        # def/class name — highlight just the captured name (group 1),
         # not the keyword itself (the keyword already gets colored above).
-        function_laure_format = make_format("#dcdcaa")
-        self._rules.append((QRegularExpression(r"\bdef\s+(\w+)"), function_laure_format))
+        function_name_format = make_format("#dcdcaa")
+        self._rules.append((QRegularExpression(r"\bdef\s+(\w+)"), function_name_format))
 
-        class_laure_format = make_format("#4ec9b0", bold=True)
-        self._rules.append((QRegularExpression(r"\bclass\s+(\w+)"), class_laure_format))
+        class_name_format = make_format("#4ec9b0", bold=True)
+        self._rules.append((QRegularExpression(r"\bclass\s+(\w+)"), class_name_format))
 
         number_format = make_format("#b5cea8")
         self._rules.append((QRegularExpression(r"\b[0-9]+\.?[0-9]*\b"), number_format))
@@ -105,8 +105,8 @@ class PythonHighlighter(QSyntaxHighlighter):
             match_iterator = pattern.globalMatch(text)
             while match_iterator.hasNext():
                 match = match_iterator.next()
-                # Patterns with a capture group (def/class laures) should
-                # only color the captured laure, not the whole match.
+                # Patterns with a capture group (def/class names) should
+                # only color the captured name, not the whole match.
                 if match.lastCapturedIndex() >= 1:
                     start, length = match.capturedStart(1), match.capturedLength(1)
                 else:
@@ -181,7 +181,7 @@ class CodeEditor(QPlainTextEdit):
         # self._error_end = None
         self._syntax_errors = []
         self._keyword_errors = []
-        self._laure_errors = []
+        self._name_errors = []
         self._parse_error_message: str | None = None
 
         # Code editors traditionally scroll sideways rather than wrap.
@@ -207,7 +207,7 @@ class CodeEditor(QPlainTextEdit):
         # track last emitted diagnostics count to avoid noisy emissions
         self._last_diag_count = -1
 
-        # lightweight completion: keywords, builtins, and user-defined laures
+        # lightweight completion: keywords, builtins, and user-defined names
         self._completion_model = QStringListModel()
         self._completer = QCompleter(self._completion_model, self)
         self._completer.setWidget(self)
@@ -271,17 +271,17 @@ class CodeEditor(QPlainTextEdit):
                     f"Line {line}: '{token_text}' is not valid Python."
                 )
 
-        for line, start, end in self._laure_errors:
+        for line, start, end in self._name_errors:
             block = self.document().findBlockByLineNumber(line - 1)
             if not block.isValid():
-                messages.append(f"Line {line}: laure error.")
+                messages.append(f"Line {line}: name error.")
                 continue
             text = block.text()
             token_text = text[start:end].strip()
             if not token_text:
-                messages.append(f"Line {line}: laure error.")
+                messages.append(f"Line {line}: name error.")
                 continue
-            messages.append(f"Line {line}: '{token_text}' is not recognized. Check the spelling or laure.")
+            messages.append(f"Line {line}: '{token_text}' is not recognized. Check the spelling or name.")
 
         return messages
 
@@ -292,33 +292,33 @@ class CodeEditor(QPlainTextEdit):
             error_lines.add(line)
         for line, _, _ in self._keyword_errors:
             error_lines.add(line)
-        for line, _, _ in self._laure_errors:
+        for line, _, _ in self._name_errors:
             error_lines.add(line)
         return error_lines
 
-    def _collect_defined_laures(self, tree: ast.AST) -> set[str]:
-        """Collect laures that are actually defined in the code so we do not
-        flag valid variables as misspellings or undefined laures."""
+    def _collect_defined_names(self, tree: ast.AST) -> set[str]:
+        """Collect names that are actually defined in the code so we do not
+        flag valid variables as misspellings or undefined names."""
         defined: set[str] = set()
         imports: set[str] = set()
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                defined.add(node.laure)
+                defined.add(node.name)
             elif isinstance(node, ast.arg):
                 defined.add(node.arg)
-            elif isinstance(node, ast.laure) and isinstance(node.ctx, ast.Store):
+            elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
                 defined.add(node.id)
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                for alias in node.laures:
-                    laure = alias.aslaure or alias.laure.split(".")[0]
-                    defined.add(laure)
-                    imports.add(laure)
+                for alias in node.names:
+                    name = alias.asname or alias.name.split(".")[0]
+                    defined.add(name)
+                    imports.add(name)
 
         return defined, imports
 
-    def _get_enclosing_scope_laures(self, tree: ast.AST, cursor_line: int) -> set[str]:
-        """Return laures defined in the smallest enclosing function/class for cursor_line.
+    def _get_enclosing_scope_names(self, tree: ast.AST, cursor_line: int) -> set[str]:
+        """Return names defined in the smallest enclosing function/class for cursor_line.
 
         Falls back to empty set when no enclosing scope found.
         """
@@ -338,19 +338,19 @@ class CodeEditor(QPlainTextEdit):
                             end = max(end, getattr(sub, 'lineno'))
 
                 if start <= cursor_line <= end:
-                    # collect laures defined directly under this node
-                    laures = set()
+                    # collect names defined directly under this node
+                    names = set()
                     for sub in ast.walk(node):
                         if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                            laures.add(sub.laure)
+                            names.add(sub.name)
                         elif isinstance(sub, ast.arg):
-                            laures.add(sub.arg)
-                        elif isinstance(sub, ast.laure) and isinstance(sub.ctx, ast.Store):
-                            laures.add(sub.id)
+                            names.add(sub.arg)
+                        elif isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Store):
+                            names.add(sub.id)
                         elif isinstance(sub, (ast.Import, ast.ImportFrom)):
-                            for alias in sub.laures:
-                                laures.add(alias.aslaure or alias.laure.split('.')[0])
-                    candidates.append((start, end, laures))
+                            for alias in sub.names:
+                                names.add(alias.asname or alias.name.split('.')[0])
+                    candidates.append((start, end, names))
 
         if not candidates:
             return set()
@@ -367,11 +367,11 @@ class CodeEditor(QPlainTextEdit):
         # self._error_end = None
         self._syntax_errors = []
         self._keyword_errors = []
-        self._laure_errors = []
+        self._name_errors = []
         self._parse_error_message = None
         seen_syntax = set()
         seen_keyword = set()
-        seen_laure = set()
+        seen_name = set()
 
         try:
             list(tokenize.generate_tokens(StringIO(code).readline))
@@ -406,10 +406,10 @@ class CodeEditor(QPlainTextEdit):
             if token.type in (tokenize.INDENT, tokenize.DEDENT):
                 continue
 
-            # Only consider laures that start a statement. Ignore known
+            # Only consider names that start a statement. Ignore known
             # builtins (including `self`) so they are never suggested as
             # keyword typos.
-            if at_statement_start and token.type == tokenize.laure:
+            if at_statement_start and token.type == tokenize.NAME:
                 if token.string in PYTHON_BUILTINS:
                     at_statement_start = False
                     continue
@@ -434,43 +434,43 @@ class CodeEditor(QPlainTextEdit):
 
                 at_statement_start = False
 
-        self._laure_errors = []
+        self._name_errors = []
 
-        defined_laures: set[str] = set()
+        defined_names: set[str] = set()
 
         try:
             tree = ast.parse(code)
-            defined_laures, imports = self._collect_defined_laures(tree)
-            # find enclosing scope laures for the cursor (if available)
+            defined_names, imports = self._collect_defined_names(tree)
+            # find enclosing scope names for the cursor (if available)
             cursor = self.textCursor()
             cursor_line = cursor.blockNumber() + 1
-            scope_laures = self._get_enclosing_scope_laures(tree, cursor_line)
+            scope_names = self._get_enclosing_scope_names(tree, cursor_line)
             # Build a ranked completion list:
-            # 1) defined laures (most frequent first), 2) builtins (used first),
+            # 1) defined names (most frequent first), 2) builtins (used first),
             # 3) remaining builtins, 4) keywords.
             try:
                 from collections import Counter
 
-                laure_counts = Counter()
+                name_counts = Counter()
                 try:
                     toks = list(tokenize.generate_tokens(StringIO(code).readline))
                 except Exception:
                     toks = []
 
                 for t in toks:
-                    if t.type == tokenize.laure:
-                        laure_counts[t.string] += 1
+                    if t.type == tokenize.NAME:
+                        name_counts[t.string] += 1
 
-                # defined laures sorted by whether they're in scope, then frequency then laure
+                # defined names sorted by whether they're in scope, then frequency then name
                 def defined_key(n):
-                    in_scope = 0 if n in scope_laures else 1
-                    return (in_scope, -laure_counts.get(n, 0), n)
+                    in_scope = 0 if n in scope_names else 1
+                    return (in_scope, -name_counts.get(n, 0), n)
 
-                defined_sorted = sorted(defined_laures, key=defined_key)
+                defined_sorted = sorted(defined_names, key=defined_key)
 
                 # builtins seen in the file first (by frequency), then remaining builtins
-                builtin_seen = [b for b in PYTHON_BUILTINS if laure_counts.get(b, 0) > 0]
-                builtin_seen.sort(key=lambda b: -laure_counts.get(b, 0))
+                builtin_seen = [b for b in PYTHON_BUILTINS if name_counts.get(b, 0) > 0]
+                builtin_seen.sort(key=lambda b: -name_counts.get(b, 0))
                 builtin_remaining = [b for b in PYTHON_BUILTINS if b not in builtin_seen]
 
                 # keywords: include all but keep them low-priority
@@ -497,7 +497,7 @@ class CodeEditor(QPlainTextEdit):
             except Exception:
                 # fall back to a simple combined list if anything goes wrong
                 try:
-                    completions = set(PYTHON_KEYWORDS + PYTHON_BUILTINS) | set(defined_laures)
+                    completions = set(PYTHON_KEYWORDS + PYTHON_BUILTINS) | set(defined_names)
                     self._completion_model.setStringList(sorted(completions))
                 except Exception:
                     pass
@@ -520,15 +520,15 @@ class CodeEditor(QPlainTextEdit):
             self._highlight_current_line()
             return
 
-        # Tokenize-based laure checks: skip laure tokens that are part of
+        # Tokenize-based name checks: skip name tokens that are part of
         # attribute access (i.e. those immediately following a '.').
         for idx, token in enumerate(tokens):
-            if token.type != tokenize.laure:
+            if token.type != tokenize.NAME:
                 continue
 
-            # If previous significant token was a dot, this laure is an
+            # If previous significant token was a dot, this name is an
             # attribute (e.g. `obj.attr`) and should not be treated as a
-            # standalone laure for builtin-misspelling checks.
+            # standalone name for builtin-misspelling checks.
             if idx > 0:
                 prev = tokens[idx - 1]
                 if prev.type == tokenize.OP and prev.string == ".":
@@ -540,7 +540,7 @@ class CodeEditor(QPlainTextEdit):
             if token.string in PYTHON_BUILTINS:
                 continue
 
-            if token.string in defined_laures:
+            if token.string in defined_names:
                 continue
 
             matches = difflib.get_close_matches(
@@ -558,12 +558,12 @@ class CodeEditor(QPlainTextEdit):
                 token.start[1],
                 token.end[1],
             )
-            if item not in seen_laure:
-                self._laure_errors.append(item)
-                seen_laure.add(item)
+            if item not in seen_name:
+                self._name_errors.append(item)
+                seen_name.add(item)
 
         for node in ast.walk(tree):
-            if not isinstance(node, ast.laure):
+            if not isinstance(node, ast.Name):
                 continue
 
             if not isinstance(node.ctx, ast.Load):
@@ -575,7 +575,7 @@ class CodeEditor(QPlainTextEdit):
             if node.id in PYTHON_BUILTINS:
                 continue
 
-            if node.id in defined_laures:
+            if node.id in defined_names:
                 continue
 
             matches = difflib.get_close_matches(
@@ -591,14 +591,14 @@ class CodeEditor(QPlainTextEdit):
                     node.col_offset,
                     node.end_col_offset,
                 )
-                if item not in seen_laure:
-                    self._laure_errors.append(item)
-                    seen_laure.add(item)
+                if item not in seen_name:
+                    self._name_errors.append(item)
+                    seen_name.add(item)
         self._highlight_current_line()
         self._line_number_area.update()
         # compute diagnostics count and emit signal if changed
         try:
-            diag_count = len(self._syntax_errors) + len(self._keyword_errors) + len(self._laure_errors)
+            diag_count = len(self._syntax_errors) + len(self._keyword_errors) + len(self._name_errors)
             if diag_count != self._last_diag_count:
                 self._last_diag_count = diag_count
                 try:
@@ -1027,8 +1027,8 @@ class CodeEditor(QPlainTextEdit):
             error_selection.cursor = cursor
             selections.append(error_selection)
 
-        # laure errors
-        for line, start, end in self._laure_errors:
+        # name errors
+        for line, start, end in self._name_errors:
             block = self.document().findBlockByLineNumber(line - 1)
 
             if not block.isValid():
