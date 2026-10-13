@@ -130,8 +130,9 @@ class MainWindow(QMainWindow):
         self._autosave_timer.timeout.connect(self._maybe_autosave)
         self._autosave_timer.start()
 
-        self._check_startup_recovery()
-
+        # Startup recovery prompts are intentionally disabled: Lau-PyDE now
+        # auto-saves the current editor content when a file is run, rather than
+        # restoring stale backups at launch.
         self.statusBar().showMessage("Ready")
         self._update_title()
 
@@ -1317,6 +1318,15 @@ class MainWindow(QMainWindow):
         self._active_prompt = ""
         self._output_line_tail = ""
         self.output_panel.stop_input()
+
+        # Auto-save the editor buffer after code execution so the current file is
+        # always persisted without a startup restore prompt.
+        if self._current_file_path and self.editor.document().isModified():
+            try:
+                self.save_file()
+            except Exception:
+                pass
+
         self._append_output(f"\nProcess finished with exit code {exit_code}. Thank You for using Lau-PyDE!\n")
         self._set_running_controls(False)
         self.statusBar().showMessage("status: ready")
@@ -1520,118 +1530,11 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, APP_NAME, f"Could not start update:\n{e}")
 
     def _check_startup_recovery(self) -> None:
-        recs = list_recoveries()
-        if not recs:
-            return
-        # Group recoveries by their original path (use a sentinel for
-        # unsaved buffers) and handle each group once so we don't loop
-        # prompting the user for multiple recovery files that belong to
-        # the same original path.
-        groups: dict[str, list[dict]] = {}
-        for meta in recs:
-            orig = meta.get("original_path")
-            key = orig if orig is not None else "<unsaved>"
-            groups.setdefault(key, []).append(meta)
+        """Startup recovery prompts are intentionally disabled.
 
-        for group_key, metas in groups.items():
-            # pick the newest recovery in this group
-            metas.sort(key=lambda m: m.get("timestamp", 0), reverse=True)
-            latest = metas[0]
-            key = latest.get("key")
-            try:
-                orig_path, content = read_recovery(key)
-            except Exception:
-                orig_path, content = None, ""
-
-            # If this group maps to an on-disk file, and the file already
-            # matches the recovered content, remove all recoveries for
-            # the path and skip prompting.
-            if orig_path:
-                try:
-                    if Path(orig_path).is_file():
-                        try:
-                            on_disk = read_file(orig_path)
-                        except Exception:
-                            on_disk = None
-
-                        if on_disk is not None and on_disk == content:
-                            try:
-                                remove_recovery_for_path(orig_path)
-                            except Exception:
-                                pass
-                            continue
-                except Exception:
-                    pass
-
-            # For unsaved groups, if any currently-open file matches the
-            # content, consider the recovery stale and remove it.
-            if orig_path is None:
-                try:
-                    if self._current_file_path and Path(self._current_file_path).is_file():
-                        try:
-                            current_on_disk = read_file(self._current_file_path)
-                        except Exception:
-                            current_on_disk = None
-
-                        if current_on_disk is not None and current_on_disk == content:
-                            # remove all unsaved recoveries
-                            try:
-                                for m in metas:
-                                    remove_recovery(m.get("key"))
-                            except Exception:
-                                pass
-                            continue
-                except Exception:
-                    pass
-
-            # Prompt the user for this group's latest recovery
-            orig = orig_path or "Unsaved file"
-            choice = QMessageBox.question(
-                self,
-                APP_NAME,
-                f"Recovered unsaved work found for: {orig}\nRestore it?",
-                QMessageBox.Yes | QMessageBox.No,
-            )
-
-            if choice == QMessageBox.Yes:
-                # Restore content into the editor. If this recovery maps
-                # to a real file path, set the current file accordingly.
-                self.editor.setPlainText(content)
-                self._current_file_path = orig_path
-                # Mark modified only if the recovery differs from on-disk
-                if orig_path and Path(orig_path).is_file():
-                    try:
-                        on_disk = read_file(orig_path)
-                    except Exception:
-                        on_disk = None
-                    self.editor.document().setModified(on_disk is None or on_disk != content)
-                else:
-                    self.editor.document().setModified(True)
-
-                self._show_editor()
-                self.statusBar().showMessage("Recovered unsaved work")
-
-                # Remove all recoveries in this group so we don't prompt again
-                try:
-                    if orig_path:
-                        remove_recovery_for_path(orig_path)
-                    else:
-                        for m in metas:
-                            remove_recovery(m.get("key"))
-                except Exception:
-                    pass
-                return
-            else:
-                # User declined: remove all recoveries for this group
-                try:
-                    if orig_path:
-                        remove_recovery_for_path(orig_path)
-                    else:
-                        for m in metas:
-                            remove_recovery(m.get("key"))
-                except Exception:
-                    pass
-
+        Lau-PyDE now auto-saves the current file whenever it is run instead of
+        restoring stale recovery files on launch.
+        """
         return
 
     def _show_bottom_panel(self, pane: str) -> None:

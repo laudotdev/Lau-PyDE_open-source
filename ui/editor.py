@@ -704,9 +704,20 @@ class CodeEditor(QPlainTextEdit):
         """Return the popup geometry anchored to the current cursor and clipped to the active screen."""
         popup = self._completer.popup()
         popup.adjustSize()
-        popup_size = popup.sizeHint().expandedTo(popup.size())
-        width = max(1, popup_size.width())
-        height = max(1, popup_size.height())
+
+        model = popup.model()
+        row_count = model.rowCount() if model is not None else 0
+        row_height = 0
+        if hasattr(popup, "sizeHintForRow"):
+            try:
+                row_height = popup.sizeHintForRow(0)
+            except Exception:
+                row_height = 0
+        if row_height <= 0:
+            row_height = max(1, popup.fontMetrics().height() + 8)
+
+        width = max(1, popup.sizeHint().width())
+        height = max(1, row_count * row_height + popup.frameWidth() * 2 + 8)
 
         cursor_rect = self.cursorRect()
         cursor_top_left = self.viewport().mapToGlobal(cursor_rect.topLeft())
@@ -744,13 +755,28 @@ class CodeEditor(QPlainTextEdit):
 
     def _reposition_completion_popup(self, *args) -> None:
         """Keep the popup anchored while the cursor moves or the editor scrolls."""
-        if not self._completer.popup().isVisible() or self._positioning_completion_popup:
+        if self._positioning_completion_popup:
             return
+        popup = self._completer.popup()
+        if not popup.isVisible():
+            return
+
+        current_prefix = self._word_under_cursor()
+        if not current_prefix:
+            popup.hide()
+            return
+
         self._position_completion_popup()
 
     def _show_completion(self) -> None:
         """Show completion anchored to the active cursor instead of Qt's default lower-edge placement."""
         cursor_rect = self.cursorRect()
+        current_prefix = self._word_under_cursor()
+
+        if not current_prefix:
+            self._completer.popup().hide()
+            return
+
         self._completer.complete(cursor_rect)
 
         popup = self._completer.popup()
@@ -890,6 +916,8 @@ class CodeEditor(QPlainTextEdit):
 
         if event.key() == Qt.Key_Backspace:
             if self._handle_backspace():
+                self._completer.popup().hide()
+                self._completer.popup().hide()
                 return
 
         # handle Tab to insert spaces up to the next indent stop
