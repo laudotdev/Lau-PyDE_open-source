@@ -686,20 +686,22 @@ class CodeEditor(QPlainTextEdit):
     def eventFilter(self, watched, event) -> bool:
         if hasattr(self, "_completer") and watched is self._completer.popup():
             if event.type() == QEvent.Show:
-                QTimer.singleShot(0, self._center_completion_popup)
+                QTimer.singleShot(0, self._position_completion_popup)
             elif event.type() == QEvent.KeyPress and event.key() == Qt.Key_Tab:
                 if self._accept_completion():
                     return True
         return super().eventFilter(watched, event)
 
-    def _center_completion_popup(self) -> None:
+    def _position_completion_popup(self) -> None:
+        """Place completion suggestions immediately above the current line."""
         popup = self._completer.popup()
         if not popup.isVisible():
             return
         popup.adjustSize()
         height = popup.sizeHint().height()
-        top = max(0, (self.viewport().height() - height) // 2)
-        left = max(0, self.cursorRect().left())
+        cursor_rect = self.cursorRect()
+        top = max(0, cursor_rect.top() - height - 2)
+        left = max(0, cursor_rect.left())
         popup.move(self.viewport().mapToGlobal(QPoint(left, top)))
 
     def _show_completion(self) -> None:
@@ -709,7 +711,7 @@ class CodeEditor(QPlainTextEdit):
         popup = self._completer.popup()
         if popup.currentIndex().row() < 0 and popup.model().rowCount() > 0:
             popup.setCurrentIndex(popup.model().index(0, 0))
-        QTimer.singleShot(10, self._center_completion_popup)
+        QTimer.singleShot(10, self._position_completion_popup)
 
     def _accept_completion(self) -> bool:
         popup = self._completer.popup()
