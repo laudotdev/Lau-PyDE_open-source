@@ -29,13 +29,13 @@ def main():
         icon_path = None
         # resources.files requires a package; `assets` is packaged via
         # pyproject.toml and an __init__.py marker.
-        logo_file = resources.files("assets").joinpath("logo.png")
+        logo_file = resources.files("assets").joinpath("lau-pyde_logo.png")
         with resources.as_file(logo_file) as p:
             icon_path = p
         app.setWindowIcon(QIcon(str(icon_path)))
     except Exception:
         BASE_DIR = Path(__file__).resolve().parent
-        ICON_PATH = BASE_DIR / "assets" / "logo.png"
+        ICON_PATH = BASE_DIR / "assets" / "lau-pyde_logo.png"
         app.setWindowIcon(QIcon(str(ICON_PATH)))
     app.setStyleSheet(DARK_STYLESHEET)
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lau-pyde"
-version = "1.0.0"
+version = "1.1.0"
 description = "A simple and lightweight Python Development Environment"
 requires-python = ">=3.10"
 dependencies = [
@@ -23,4 +23,4 @@ where = ["."]
 include = ["core*", "ui*", "assets*"]
 
 [tool.setuptools.package-data]
-"assets" = ["logo.png", "icons/*.svg"]
+"assets" = ["lau-pyde_logo.png", "icons/*.svg"]
