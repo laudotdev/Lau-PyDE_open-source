@@ -723,6 +723,17 @@ class MainWindow(QMainWindow):
         focus_terminal_action.triggered.connect(self._focus_terminal)
         terminal_menu.addAction(focus_terminal_action)
 
+        # line numbers
+        line_numbers_menu = menu_bar.addMenu("&Line Numbers")
+
+        increment_line_number_action = QAction("Increment Line Numbers (default)", self)
+        pass
+        line_numbers_menu.addAction(increment_line_number_action)
+
+        relative_line_numbers_action = QAction("Relative Line Numbers (advanced)", self)
+        pass
+        line_numbers_menu.addAction(relative_line_numbers_action)
+
         # Git actions (Feature 9): interactive push which may prompt for credentials
         git_menu = menu_bar.addMenu("&Git")
 
