@@ -141,6 +141,31 @@ class LineNumberArea(QWidget):
         self._editor.paint_line_numbers(event)
 
 
+def _keyword_suggestion(token_text: str) -> str | None:
+    """Return a likely keyword typo suggestion only for genuinely close matches.
+
+    This rejects valid Python identifiers such as ``model`` while still catching
+    actual misspellings like ``frmo`` -> ``from`` or ``forr`` -> ``for``.
+    """
+    if not token_text:
+        return None
+
+    best_match = None
+    best_ratio = 0.0
+    for keyword in PYTHON_KEYWORDS:
+        if keyword == token_text:
+            continue
+        if abs(len(token_text) - len(keyword)) > 1:
+            continue
+
+        ratio = difflib.SequenceMatcher(None, token_text, keyword).ratio()
+        if ratio >= 0.85 and ratio > best_ratio:
+            best_match = keyword
+            best_ratio = ratio
+
+    return best_match
+
+
 class CodeEditor(QPlainTextEdit):
     # notify listeners when diagnostics/count changes: emits int (total issues)
     diagnostics_changed = Signal(int)
@@ -259,16 +284,9 @@ class CodeEditor(QPlainTextEdit):
                 messages.append(f"Line {line}: Possible keyword typo.")
                 continue
 
-            matches = difflib.get_close_matches(
-                token_text,
-                PYTHON_KEYWORDS,
-                n=1,
-                cutoff=0.75,
-            )
+            suggestion = _keyword_suggestion(token_text)
 
-            if matches:
-                suggestion = matches[0]
-
+            if suggestion:
                 messages.append(
                     f"Line {line}: '{token_text}' is not valid Python. "
                     f"Did you mean '{suggestion}'?"
@@ -422,14 +440,8 @@ class CodeEditor(QPlainTextEdit):
                     continue
 
                 if token.string not in PYTHON_KEYWORDS:
-                    matches = difflib.get_close_matches(
-                        token.string,
-                        PYTHON_KEYWORDS,
-                        n=1,
-                        cutoff=0.75,
-                    )
-
-                    if matches:
+                    suggestion = _keyword_suggestion(token.string)
+                    if suggestion:
                         item = (
                             token.start[0],
                             token.start[1],
