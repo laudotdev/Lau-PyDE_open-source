@@ -13,7 +13,7 @@ Lau-PyDE is designed around one simple workflow:
 It is intentionally focused on the basic Python development workflow instead of trying to become a PyCharm or VS Code clone.
 
 **Repository:**  
-https://github.com/ryuuufynnn/Lau-PyDE_open-source
+https://github.com/laudotdev/Lau-PyDE_open-source
 
 ---
 
@@ -216,7 +216,7 @@ pipx --version
 Clone and install Lau-PyDE:
 
 ```bash
-git clone https://github.com/ryuuufynnn/Lau-PyDE_open-source.git
+git clone https://github.com/laudotdev/Lau-PyDE_open-source.git
 cd Lau-PyDE_open-source
 pipx install .
 ```
@@ -250,7 +250,7 @@ pipx ensurepath
 Then install Lau-PyDE:
 
 ```bash
-git clone https://github.com/ryuuufynnn/Lau-PyDE_open-source.git
+git clone https://github.com/laudotdev/Lau-PyDE_open-source.git
 cd Lau-PyDE_open-source
 pipx install .
 ```
@@ -271,7 +271,7 @@ pipx ensurepath
 Then:
 
 ```bash
-git clone https://github.com/ryuuufynnn/Lau-PyDE_open-source.git
+git clone https://github.com/laudotdev/Lau-PyDE_open-source.git
 cd Lau-PyDE_open-source
 pipx install .
 ```
@@ -290,7 +290,7 @@ Once `pipx` is installed:
 
 ```bash
 pipx ensurepath
-git clone https://github.com/ryuuufynnn/Lau-PyDE_open-source.git
+git clone https://github.com/laudotdev/Lau-PyDE_open-source.git
 cd Lau-PyDE_open-source
 pipx install .
 ```
@@ -306,7 +306,7 @@ pyde lau
 For a pipx-supported source-control installation, you can also install directly from the repository:
 
 ```bash
-pipx install git+https://github.com/ryuuufynnn/Lau-PyDE_open-source.git
+pipx install git+https://github.com/laudotdev/Lau-PyDE_open-source.git
 ```
 
 Then:
