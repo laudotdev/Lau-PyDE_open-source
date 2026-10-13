@@ -728,7 +728,7 @@ class MainWindow(QMainWindow):
         line_number_group = QActionGroup(self)
         line_number_group.setExclusive(True)
 
-        increment_line_number_action = QAction("Absolute Line Numbers", self)
+        increment_line_number_action = QAction("Absolute Line Numbers (Default)", self)
         increment_line_number_action.setCheckable(True)
         increment_line_number_action.setChecked(True)
         increment_line_number_action.triggered.connect(
@@ -737,7 +737,7 @@ class MainWindow(QMainWindow):
         line_number_group.addAction(increment_line_number_action)
         line_numbers_menu.addAction(increment_line_number_action)
 
-        relative_line_numbers_action = QAction("Relative Line Numbers", self)
+        relative_line_numbers_action = QAction("Relative Line Numbers (Advanced)", self)
         relative_line_numbers_action.setCheckable(True)
         relative_line_numbers_action.triggered.connect(
             lambda: self.editor.set_line_number_mode("relative")

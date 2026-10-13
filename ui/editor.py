@@ -15,7 +15,7 @@ from PySide6.QtGui import (
     QShortcut,
     QKeySequence,
 )
-from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget, QMenu, QCompleter
+from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget, QMenu, QCompleter, QApplication
 from PySide6.QtCore import QStringListModel
 
 PYTHON_KEYWORDS = [
@@ -210,11 +210,17 @@ class CodeEditor(QPlainTextEdit):
 
         # lightweight completion: keywords, builtins, and user-defined names
         self._completion_model = QStringListModel()
+        self._positioning_completion_popup = False
         self._completer = QCompleter(self._completion_model, self)
         self._completer.setWidget(self)
         self._completer.setCompletionMode(QCompleter.PopupCompletion)
         self._completer.setCaseSensitivity(Qt.CaseInsensitive)
         self._completer.popup().installEventFilter(self)
+        self._completion_model.modelReset.connect(self._reposition_completion_popup)
+        self._completion_model.rowsInserted.connect(self._reposition_completion_popup)
+        self._completion_model.rowsRemoved.connect(self._reposition_completion_popup)
+        self.cursorPositionChanged.connect(self._reposition_completion_popup)
+        self.updateRequest.connect(self._reposition_completion_popup)
 
         # now safe to connect textChanged
         self.textChanged.connect(self._check_errors)
@@ -686,32 +692,81 @@ class CodeEditor(QPlainTextEdit):
     def eventFilter(self, watched, event) -> bool:
         if hasattr(self, "_completer") and watched is self._completer.popup():
             if event.type() == QEvent.Show:
-                QTimer.singleShot(0, self._position_completion_popup)
+                self._reposition_completion_popup()
+            elif event.type() in (QEvent.Move, QEvent.Resize) and not self._positioning_completion_popup:
+                self._reposition_completion_popup()
             elif event.type() == QEvent.KeyPress and event.key() == Qt.Key_Tab:
                 if self._accept_completion():
                     return True
         return super().eventFilter(watched, event)
 
+    def _completion_popup_geometry(self) -> QRect:
+        """Return the popup geometry anchored to the current cursor and clipped to the active screen."""
+        popup = self._completer.popup()
+        popup.adjustSize()
+        popup_size = popup.sizeHint().expandedTo(popup.size())
+        width = max(1, popup_size.width())
+        height = max(1, popup_size.height())
+
+        cursor_rect = self.cursorRect()
+        cursor_top_left = self.viewport().mapToGlobal(cursor_rect.topLeft())
+        cursor_bottom_left = self.viewport().mapToGlobal(cursor_rect.bottomLeft())
+
+        screen = QApplication.screenAt(cursor_top_left) or QApplication.primaryScreen()
+        available = screen.availableGeometry()
+
+        left = cursor_top_left.x()
+        left = min(max(left, available.left()), max(available.left(), available.right() - width))
+
+        space_above = cursor_top_left.y() - available.top()
+        prefer_above = space_above >= height + 6
+        top = cursor_top_left.y() - height - 4 if prefer_above else cursor_bottom_left.y() + 4
+
+        if top + height > available.bottom():
+            top = available.bottom() - height
+        if top < available.top():
+            top = available.top()
+
+        return QRect(left, top, width, height)
+
     def _position_completion_popup(self) -> None:
-        """Place completion suggestions immediately above the current line."""
+        """Anchor completion suggestions to the cursor, preferring above it."""
         popup = self._completer.popup()
         if not popup.isVisible():
             return
-        popup.adjustSize()
-        height = popup.sizeHint().height()
-        cursor_rect = self.cursorRect()
-        top = max(0, cursor_rect.top() - height - 2)
-        left = max(0, cursor_rect.left())
-        popup.move(self.viewport().mapToGlobal(QPoint(left, top)))
+
+        geometry = self._completion_popup_geometry()
+        self._positioning_completion_popup = True
+        try:
+            popup.setGeometry(geometry)
+        finally:
+            self._positioning_completion_popup = False
+
+    def _reposition_completion_popup(self, *args) -> None:
+        """Keep the popup anchored while the cursor moves or the editor scrolls."""
+        if not self._completer.popup().isVisible() or self._positioning_completion_popup:
+            return
+        self._position_completion_popup()
 
     def _show_completion(self) -> None:
-        """Show completion centered on the cursor using the same geometry on all platforms."""
-        self._completer.complete()
+        """Show completion anchored to the active cursor instead of Qt's default lower-edge placement."""
+        cursor_rect = self.cursorRect()
+        self._completer.complete(cursor_rect)
 
         popup = self._completer.popup()
         if popup.currentIndex().row() < 0 and popup.model().rowCount() > 0:
             popup.setCurrentIndex(popup.model().index(0, 0))
-        QTimer.singleShot(10, self._position_completion_popup)
+        # Qt uses the live cursor rectangle during the initial popup placement,
+        # then we keep it aligned as the cursor moves or the editor scrolls.
+        self._reposition_completion_popup()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        rect = self.contentsRect()
+        self._line_number_area.setGeometry(
+            QRect(rect.left(), rect.top(), self.line_number_area_width(), rect.height())
+        )
+        self._reposition_completion_popup()
 
     def _accept_completion(self) -> bool:
         popup = self._completer.popup()
@@ -935,13 +990,6 @@ class CodeEditor(QPlainTextEdit):
             self._line_number_area.update(0, rect.y(), self._line_number_area.width(), rect.height())
         if rect.contains(self.viewport().rect()):
             self._update_line_number_area_width(0)
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        rect = self.contentsRect()
-        self._line_number_area.setGeometry(
-            QRect(rect.left(), rect.top(), self.line_number_area_width(), rect.height())
-        )
 
     def paint_line_numbers(self, event) -> None:
         painter = QPainter(self._line_number_area)
@@ -1329,8 +1377,8 @@ class CodeEditor(QPlainTextEdit):
             selection = QTextEdit.ExtraSelection()
             selection.cursor = cursor
             fmt = QTextCharFormat()
-            fmt.setBackground(QColor("#57B9FF"))
-            fmt.setForeground(Qt.GlobalColor.black)
+            fmt.setBackground(QColor("#4C5BFF"))
+            fmt.setForeground(Qt.GlobalColor.white)
             selection.format = fmt
             selections.append(selection)
         self.setExtraSelections(selections)
