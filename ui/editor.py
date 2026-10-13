@@ -820,6 +820,22 @@ class CodeEditor(QPlainTextEdit):
         popup.hide()
         return True
 
+    def zoom_in(self) -> None:
+        font = self.font()
+        size = font.pointSize() or 11
+        font.setPointSize(max(8, min(32, size + 1)))
+        self.setFont(font)
+        self._line_number_area.setFont(font)
+        self._update_line_number_area_width(0)
+
+    def zoom_out(self) -> None:
+        font = self.font()
+        size = font.pointSize() or 11
+        font.setPointSize(max(8, min(32, size - 1)))
+        self.setFont(font)
+        self._line_number_area.setFont(font)
+        self._update_line_number_area_width(0)
+
     def keyPressEvent(self, event) -> None:
         if self.multi_cursor_active and self._handle_multi_cursor_input(event):
             return
@@ -917,6 +933,14 @@ class CodeEditor(QPlainTextEdit):
             cursor.insertText(" " * to_insert)
             self.setTextCursor(cursor)
             return
+
+        if event.modifiers() & Qt.ControlModifier:
+            if event.key() in (Qt.Key_Plus, Qt.Key_Equal) and (event.modifiers() & Qt.ShiftModifier or event.text() == "+"):
+                self.zoom_in()
+                return
+            if event.key() == Qt.Key_Minus:
+                self.zoom_out()
+                return
 
         if (event.key() == Qt.Key_Slash and event.modifiers() & Qt.ControlModifier):
             self.toggle_comment()
