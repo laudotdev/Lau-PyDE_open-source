@@ -12,6 +12,8 @@ from PySide6.QtGui import (
     QTextFormat,
     QTextCursor,
     QAction,
+    QShortcut,
+    QKeySequence,
 )
 from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget, QMenu, QCompleter
 from PySide6.QtCore import QStringListModel
@@ -153,6 +155,20 @@ class CodeEditor(QPlainTextEdit):
 
     def __init__(self):
         super().__init__()
+        # this block is for the Ctrl+Shift+H shortcut to highlight all instances of the selected word
+        self.highlight_shortcut = QShortcut(
+            QKeySequence("Ctrl+Shift+H"), self
+        )
+        self.highlight_shortcut.activated.connect(
+            self.syntax_highlight_change
+        )
+
+        self.multi_cursor_positions = []
+        self.multi_cursor_active = False
+        self._multi_cursor_word = ""
+        self._multi_cursor_replacement = ""
+        self._multi_cursor_starts = []
+        self._multi_cursor_original_length = 0
 
         # A monospace font is essential for code so columns line up.
         font = QFont("Consolas")
@@ -709,6 +725,8 @@ class CodeEditor(QPlainTextEdit):
         return True
 
     def keyPressEvent(self, event) -> None:
+        if self.multi_cursor_active and self._handle_multi_cursor_input(event):
+            return
         if event.key() in (Qt.Key_Tab, Qt.Key_Backtab) and not (event.modifiers() & Qt.ShiftModifier):
             if self._accept_completion():
                 return
@@ -721,7 +739,11 @@ class CodeEditor(QPlainTextEdit):
         if event.key() == Qt.Key_Backspace:
             if self._handle_backspace():
                 return
-        
+
+        if event.key() == Qt.Key.Key_D and event.modifiers() & Qt.KeyboardModifier.ControlModifier and event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+            self.syntax_highlight_change()
+            return
+
         """
         handle tab hihglighting and indentation. If the user presses Tab, we want insert spaces to the next indentation stop (e.g., 4 spaces). If the user presses Shift+Tab, remove spaces up to the previous indentation stop. If the user has a selection, indent or outdent all selected lines.
         """
@@ -1245,3 +1267,75 @@ class CodeEditor(QPlainTextEdit):
             QTextCursor.KeepAnchor,
         )
         self.setTextCursor(selection)
+    
+    def _handle_multi_cursor_input(self, event) -> bool:
+        if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier):
+            return False
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Tab, Qt.Key_Backtab):
+            return False
+        text = event.text()
+        if not text and event.key() != Qt.Key_Backspace:
+            return False
+
+        previous = self._multi_cursor_replacement
+        replacement = previous[:-1] if event.key() == Qt.Key_Backspace else previous + text
+        current_length = len(previous) or self._multi_cursor_original_length
+        position_delta = 0 if not previous else len(previous) - self._multi_cursor_original_length
+
+        document = self.document()
+        edit = QTextCursor(document)
+        edit.beginEditBlock()
+        for index in reversed(range(len(self._multi_cursor_starts))):
+            start = self._multi_cursor_starts[index] + index * position_delta
+            edit.setPosition(start)
+            edit.setPosition(start + current_length, QTextCursor.KeepAnchor)
+            edit.insertText(replacement)
+        edit.endEditBlock()
+        self._multi_cursor_replacement = replacement
+        if not replacement:
+            self.multi_cursor_active = False
+            self.setExtraSelections([])
+        else:
+            self._highlight_multi_cursor_occurrences()
+        return True
+
+    def _highlight_multi_cursor_occurrences(self) -> None:
+        selections = []
+        document = self.document()
+        token = self._multi_cursor_replacement or self._multi_cursor_word
+        cursor = QTextCursor(document)
+        while True:
+            cursor = document.find(token, cursor)
+            if cursor.isNull():
+                break
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = cursor
+            fmt = QTextCharFormat()
+            fmt.setBackground(Qt.GlobalColor.green)
+            fmt.setForeground(Qt.GlobalColor.black)
+            selection.format = fmt
+            selections.append(selection)
+        self.setExtraSelections(selections)
+
+    def syntax_highlight_change(self):
+        """Select every occurrence for synchronized replacement editing."""
+        cursor = self.textCursor()
+        if cursor.hasSelection():
+            word = cursor.selectedText()
+        else:
+            cursor.select(QTextCursor.WordUnderCursor)
+            word = cursor.selectedText()
+        if not word:
+            return
+        self._multi_cursor_word = word
+        self._multi_cursor_replacement = ""
+        self._multi_cursor_original_length = len(word)
+        self._multi_cursor_starts = []
+        search = QTextCursor(self.document())
+        while True:
+            search = self.document().find(word, search)
+            if search.isNull():
+                break
+            self._multi_cursor_starts.append(search.selectionStart())
+        self.multi_cursor_active = True
+        self._highlight_multi_cursor_occurrences()
