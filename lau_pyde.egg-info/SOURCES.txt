@@ -3,7 +3,14 @@ launcher.py
 main.py
 pyproject.toml
 assets/__init__.py
+assets/lau-pyde_logo.png
 assets/logo.png
+assets/icons/maximize.svg
+assets/icons/minimize.svg
+assets/icons/orient-left.svg
+assets/icons/orient-right.svg
+assets/icons/play.svg
+assets/icons/stop.svg
 core/file_manager.py
 core/runner.py
 lau_pyde.egg-info/PKG-INFO
@@ -21,4 +28,5 @@ ui/editor.py
 ui/explorer.py
 ui/inline_output.py
 ui/main_window.py
+ui/panel_icons.py
 ui/terminal.py

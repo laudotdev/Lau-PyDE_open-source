@@ -5,7 +5,7 @@ import re
 import sys
 from typing import Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
 from PySide6.QtWidgets import QTextEdit
@@ -45,6 +45,7 @@ from ui.terminal import TerminalPanel
 
 APP_NAME = "Lau-PyDE"
 APP_VERSION = "0.0.1"
+SETTINGS_ORGANIZATION = "Lau-PyDE"
 
 RECENT_PROJECT_FILE = Path.home() / ".lau_pyde_recent.json"
 
@@ -782,9 +783,8 @@ class MainWindow(QMainWindow):
 
         increment_line_number_action = QAction("Absolute Line Numbers (Default)", self)
         increment_line_number_action.setCheckable(True)
-        increment_line_number_action.setChecked(True)
         increment_line_number_action.triggered.connect(
-            lambda: self.editor.set_line_number_mode("absolute")
+            lambda: self._set_line_number_mode("absolute")
         )
         line_number_group.addAction(increment_line_number_action)
         line_numbers_menu.addAction(increment_line_number_action)
@@ -792,7 +792,7 @@ class MainWindow(QMainWindow):
         relative_line_numbers_action = QAction("Relative Line Numbers (Advanced)", self)
         relative_line_numbers_action.setCheckable(True)
         relative_line_numbers_action.triggered.connect(
-            lambda: self.editor.set_line_number_mode("relative")
+            lambda: self._set_line_number_mode("relative")
         )
         line_number_group.addAction(relative_line_numbers_action)
         line_numbers_menu.addAction(relative_line_numbers_action)
@@ -800,10 +800,22 @@ class MainWindow(QMainWindow):
         hybrid_line_numbers_action = QAction("Hybrid Line Numbers (Neovim)", self)
         hybrid_line_numbers_action.setCheckable(True)
         hybrid_line_numbers_action.triggered.connect(
-            lambda: self.editor.set_line_number_mode("hybrid")
+            lambda: self._set_line_number_mode("hybrid")
         )
         line_number_group.addAction(hybrid_line_numbers_action)
         line_numbers_menu.addAction(hybrid_line_numbers_action)
+
+        self._line_number_actions = {
+            "absolute": increment_line_number_action,
+            "relative": relative_line_numbers_action,
+            "hybrid": hybrid_line_numbers_action,
+        }
+        saved_line_number_mode = QSettings(
+            SETTINGS_ORGANIZATION, APP_NAME
+        ).value("line_number_mode", "absolute")
+        if saved_line_number_mode not in self._line_number_actions:
+            saved_line_number_mode = "absolute"
+        self._set_line_number_mode(saved_line_number_mode, persist=False)
 
         # Git actions (Feature 9): interactive push which may prompt for credentials
         git_menu = menu_bar.addMenu("&Git")
@@ -1621,6 +1633,15 @@ class MainWindow(QMainWindow):
         self._file_label.setText(name)
         self._error_badge.setText(f"{error_count}" if error_count > 0 else "")
         self.setWindowTitle(f"{title} — {APP_NAME}")
+
+    def _set_line_number_mode(self, mode: str, persist: bool = True) -> None:
+        """Apply the line-number mode and remember it for the next launch."""
+        self.editor.set_line_number_mode(mode)
+        self._line_number_actions[mode].setChecked(True)
+        if persist:
+            settings = QSettings(SETTINGS_ORGANIZATION, APP_NAME)
+            settings.setValue("line_number_mode", mode)
+            settings.sync()
 
     def closeEvent(self, event) -> None:
         """Called automatically by Qt when the user tries to close the window."""
