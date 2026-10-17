@@ -1,53 +1,41 @@
-# Lau-PyDE v1.1.0 release notes
+# Lau-PyDE v1.1.0
 
-Status: prepared, not yet published.
+## What’s new
 
-## Highlights
+Lau-PyDE v1.1.0 adds a safer, more informative update experience and improves distribution support across Linux and Windows.
 
-- Added background GitHub Releases update checking.
-- Added semantic version handling for standard and legacy Lau-PyDE release tags.
-- Added platform-aware download routing with a safe website fallback.
-- Organized Linux installer files under `installer/arch/` and `installer/linux/`.
-- Prepared the Windows PyInstaller and Inno Setup workflow.
-- Added the `lau-pyde_logo.ico` Windows application and installer icon.
+### Update notifications
 
-## Windows build
+- Lau-PyDE now checks GitHub Releases in the background when the application starts.
+- Manual checking remains available from Help → Update Lau-PyDE.
+- Checks use semantic version comparison instead of alphabetical text comparison.
+- Legacy release tags such as `Lau-PyDE_v1.0`, `Lau-PyDE_v1.0.0`, `v1.0`, and `v1.0.0` are recognized.
+- Draft and prerelease versions are ignored.
+- Network failures do not interrupt the editor or produce repeated startup dialogs.
+- Updates are never downloaded, installed, or executed automatically.
 
-Run on Windows from the repository root:
+### Download guidance
 
-```powershell
-py -m pip install -e .
-py -m pip install pyinstaller
-pyinstaller installer/windows/main.spec
-iscc installer/windows/Lau-PyDE.iss
-```
+- Windows releases can use the Windows installer asset when one is published.
+- Arch Linux releases can use the `.pkg.tar.zst` asset when one is published.
+- Other Linux distributions are directed to the verified downloads page.
+- If a platform asset is unavailable, Lau-PyDE safely falls back to the downloads page.
 
-Expected output:
+### Linux packaging
 
-```text
-dist\installer\Lau-PyDE-Setup-v1.1.0.exe
-```
+- Installer files are organized under `installer/arch/` and `installer/linux/`.
+- Arch Linux packaging continues to use the native `makepkg` workflow.
+- Generic Linux installation continues to use a user-level virtual environment.
+- Existing settings and project files are preserved during installation updates.
 
-The installer must be tested on Windows before publishing. This repository checkout has not produced or runtime-tested the Windows executable.
+### Windows installer preparation
 
-## Linux validation
+- Added a PyInstaller specification for the standalone application.
+- Added an Inno Setup configuration for `Lau-PyDE-Setup-v1.1.0.exe`.
+- Added the `lau-pyde_logo.ico` application and installer icon.
+- Added license text, Start Menu and optional desktop shortcuts, and a launch-after-install option.
+- The installer does not automatically pin Lau-PyDE to the taskbar.
 
-```sh
-python3 -m pytest -q
-python3 -m compileall -q core ui main.py launcher.py
-./installer/arch/build-arch-package.sh
-./installer/linux/install.sh
-```
+## Notes
 
-The Arch package requires an Arch Linux environment with `makepkg`. The generic Linux installer is user-level and should be tested without unnecessary root privileges.
-
-## Publishing checklist
-
-- Confirm all tests pass.
-- Build and test the Windows installer on Windows.
-- Build and inspect the Arch package on Arch Linux.
-- Test the generic Linux installer.
-- Publish the stable GitHub release with tag `v1.1.0`.
-- Upload only verified release assets.
-- Verify the updater against the published release after publication.
-- Update the website download links separately and verify deployment.
+The `v1.1.0` GitHub release and Windows installer must be published and verified separately. The existing stable GitHub release remains unchanged.
