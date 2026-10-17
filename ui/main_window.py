@@ -1645,11 +1645,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(notes_view, 1)
         buttons = QDialogButtonBox(dialog)
         download = buttons.addButton("Download Update", QDialogButtonBox.AcceptRole)
-        buttons.addButton("Close", QDialogButtonBox.RejectRole)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
+        close = buttons.addButton("Close", QDialogButtonBox.RejectRole)
+        download.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url or RELEASE_PAGE)))
+        download.clicked.connect(dialog.accept)
+        close.clicked.connect(dialog.reject)
         layout.addWidget(buttons)
-        buttons.accepted.connect(lambda: QDesktopServices.openUrl(QUrl(url or RELEASE_PAGE)))
         dialog.exec()
 
     def _update_failed(self, _error: str, manual: bool) -> None:
