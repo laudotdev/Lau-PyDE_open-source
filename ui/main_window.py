@@ -1664,11 +1664,12 @@ class MainWindow(QMainWindow):
         download = buttons.addButton("Download Update", QDialogButtonBox.AcceptRole)
         close = buttons.addButton("Close", QDialogButtonBox.RejectRole)
         download.setDefault(True)
-        download.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url or RELEASE_PAGE)))
         download.clicked.connect(dialog.accept)
         close.clicked.connect(dialog.reject)
         layout.addWidget(buttons)
-        dialog.exec()
+        result = dialog.exec()
+        if result == QDialog.Accepted:
+            QDesktopServices.openUrl(QUrl(url or RELEASE_PAGE))
 
     def _update_failed(self, _error: str, manual: bool) -> None:
         self.statusBar().showMessage("Update check unavailable")
