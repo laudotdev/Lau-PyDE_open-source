@@ -3,16 +3,20 @@ import json
 import os
 import re
 import sys
+import time
 from typing import Optional
 
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, QThread, QUrl
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
 from PySide6.QtWidgets import QTextEdit
 from PySide6.QtWidgets import (
+    QDialog,
     QFileDialog,
     QHBoxLayout,
     QInputDialog,
+    QDialogButtonBox,
+    QTextBrowser,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -26,7 +30,7 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     
 )
-from PySide6.QtGui import QShortcut
+from PySide6.QtGui import QShortcut, QDesktopServices
 from ui.panel_icons import panel_icon, ICON_SIZE
 
 from core.file_manager import read_file, write_file
@@ -42,9 +46,10 @@ from ui.editor import CodeEditor
 from ui.explorer import FileExplorer
 from ui.inline_output import InlineInputOutput
 from ui.terminal import TerminalPanel
+from core.update_checker import RELEASE_PAGE, UpdateWorker, compare_versions, current_platform, select_download_url
 
 APP_NAME = "Lau-PyDE"
-APP_VERSION = "0.0.1"
+APP_VERSION = "1.1.0"
 SETTINGS_ORGANIZATION = "Lau-PyDE"
 
 RECENT_PROJECT_FILE = Path.home() / ".lau_pyde_recent.json"
@@ -169,6 +174,9 @@ class MainWindow(QMainWindow):
         self._explorer_minimized = False
         self._bottom_minimized = False
         self._project_root_permission_granted = False
+        self._update_thread = None
+        self._update_worker = None
+        self._last_update_version = None
 
         self.resize(1200, 800)
 
@@ -187,6 +195,7 @@ class MainWindow(QMainWindow):
         # restoring stale backups at launch.
         self.statusBar().showMessage("Ready")
         self._update_title()
+        QTimer.singleShot(1500, self._startup_update_check)
 
     # main setup
     def _build_widgets(self) -> None:
@@ -1576,21 +1585,77 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, APP_NAME, f"Could not start git push:\n{e}")
 
+    def _startup_update_check(self) -> None:
+        settings = QSettings(SETTINGS_ORGANIZATION, APP_NAME)
+        last_check = float(settings.value("last_update_check", 0) or 0)
+        if time.time() - last_check < 24 * 60 * 60:
+            return
+        settings.setValue("last_update_check", time.time())
+        self._check_for_updates(manual=False)
+
     def _update_lau_pyde(self) -> None:
-        """Attempt to update the Lau-PyDE source by pulling from the git
-        remote. This runs `git pull --rebase` in the project root and
-        shows output in the terminal panel. This is intentionally a
-        simple helper — network failures, detached HEAD, or diverging
-        histories are shown to the user but not auto-resolved.
-        """
-        # prefer current folder; fall back to repo root of this file
-        folder = self._current_folder or str(Path(__file__).resolve().parent.parent)
-        self._show_bottom_panel("terminal")
-        try:
-            self.terminal_panel.set_working_directory(str(folder))
-            self.terminal_panel._run_command("git pull --rebase")
-        except Exception as e:
-            QMessageBox.critical(self, APP_NAME, f"Could not start update:\n{e}")
+        self._check_for_updates(manual=True)
+
+    def _check_for_updates(self, manual: bool = False) -> None:
+        if self._update_thread is not None and self._update_thread.isRunning():
+            if manual:
+                self.statusBar().showMessage("Already checking for updates...")
+            return
+        self._update_thread = QThread(self)
+        self._update_worker = UpdateWorker()
+        self._update_worker.moveToThread(self._update_thread)
+        self._update_thread.started.connect(self._update_worker.run)
+        self._update_worker.finished.connect(lambda release: self._update_result(release, manual))
+        self._update_worker.failed.connect(lambda error: self._update_failed(error, manual))
+        self._update_worker.finished.connect(self._update_thread.quit)
+        self._update_worker.failed.connect(self._update_thread.quit)
+        self._update_thread.finished.connect(self._update_worker.deleteLater)
+        self._update_thread.finished.connect(self._update_thread.deleteLater)
+        self._update_thread.finished.connect(self._update_finished)
+        self._update_thread.start()
+        if manual:
+            self.statusBar().showMessage("Checking for updates...")
+
+    def _update_finished(self) -> None:
+        self._update_thread = None
+        self._update_worker = None
+
+    def _update_result(self, release, manual: bool) -> None:
+        comparison = compare_versions(release.version, APP_VERSION)
+        if comparison is None or comparison <= 0:
+            if manual:
+                QMessageBox.information(self, APP_NAME, f"Lau-PyDE {APP_VERSION} is up to date.")
+            return
+        if release.version == self._last_update_version:
+            return
+        self._last_update_version = release.version
+        notes = release.notes[:800] or "No release notes were provided."
+        url = select_download_url(release, current_platform())
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Lau-PyDE update available")
+        dialog.setMinimumWidth(480)
+        dialog.setMaximumHeight(460)
+        layout = QVBoxLayout(dialog)
+        summary = QLabel(f"Lau-PyDE {release.version} is available (you have {APP_VERSION}).")
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+        notes_view = QTextBrowser(dialog)
+        notes_view.setOpenExternalLinks(True)
+        notes_view.setMarkdown(f"# Lau-PyDE {release.version}\n\n{notes}")
+        layout.addWidget(notes_view, 1)
+        buttons = QDialogButtonBox(dialog)
+        download = buttons.addButton("Download Update", QDialogButtonBox.AcceptRole)
+        buttons.addButton("Close", QDialogButtonBox.RejectRole)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        buttons.accepted.connect(lambda: QDesktopServices.openUrl(QUrl(url or RELEASE_PAGE)))
+        dialog.exec()
+
+    def _update_failed(self, _error: str, manual: bool) -> None:
+        self.statusBar().showMessage("Update check unavailable")
+        if manual:
+            QMessageBox.information(self, APP_NAME, "Could not check for updates right now. Please try again later.")
 
     def _check_startup_recovery(self) -> None:
         """Startup recovery prompts are intentionally disabled.
