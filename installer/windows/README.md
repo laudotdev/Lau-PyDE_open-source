@@ -9,7 +9,13 @@ Install Python 3.10 or newer, Git, PyInstaller, and Inno Setup on Windows. From 
 ```powershell
 py -m pip install -e .
 py -m pip install pyinstaller
-pyinstaller --name Lau-PyDE --windowed --icon assets/lau-pyde_logo.png main.py
+pyinstaller installer/windows/main.spec
+```
+
+Then compile `installer/windows/Lau-PyDE.iss` with Inno Setup Compiler (`ISCC.exe`). The expected output is:
+
+```text
+dist\installer\Lau-PyDE-Setup-v1.1.0.exe
 ```
 
 The final Inno Setup script should consume the generated application files and produce:
@@ -22,12 +28,13 @@ The output name is a release convention only until an actual Windows build verif
 
 ## Installer behavior to configure
 
-The eventual Inno Setup installer should:
+The included Inno Setup script is configured to:
 
 - show the project license text supplied by the repository once a license file is added;
 - offer a Start Menu shortcut and an optional desktop shortcut;
 - offer a launch-after-install checkbox;
 - use the normal Windows uninstall entry;
+- use `lau-pyde_logo.ico` for the installer, executable, shortcuts, and taskbar identity;
 - preserve Lau-PyDE settings and project files when upgrading or uninstalling;
 - install the application under a standard per-machine or per-user location selected by the installer configuration;
 - not attempt to pin the application to the taskbar automatically, because Windows does not provide a stable supported installer action for that behavior.
