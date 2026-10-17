@@ -101,6 +101,23 @@ https://github.com/laudotdev/Lau-PyDE_open-source
 - Panel controls keep consistent sizing, padding, spacing, and alignment on Linux and Windows
 - Output orientation can move between bottom and right layouts
 
+## v1.1.0 release validation
+
+Run the automated checks before preparing release assets:
+
+```sh
+python3 -m pytest -q
+python3 -m compileall -q core ui main.py launcher.py
+```
+
+On Arch Linux, build the package with `./installer/arch/build-arch-package.sh`. Confirm the resulting file exists under `installer/arch/` before publishing it.
+
+For generic Linux, run `./installer/linux/install.sh`; uninstall with `./installer/linux/uninstall.sh`. These scripts use a user-level installation and do not replace user projects or settings.
+
+The Windows installer must be built and tested on Windows using the workflow in `installer/windows/README.md`. This Arch environment has not produced or runtime-tested the Windows installer.
+
+GitHub Releases remains the source of release metadata. The website source is not part of this repository, so website deployment and platform-specific website links require separate verification.
+
 ## Installation & Packaging
 
 - Installable as a Python application package
@@ -154,7 +171,7 @@ The benchmark reflects the project's main design goal: **keep the IDE simple and
 
 # Installation
 
-Lau-PyDE v1.0 is currently distributed as an installable Python package from the source repository. A standalone native Linux installer is **not included yet**.
+Lau-PyDE v1.1.0 is currently distributed as an installable Python package from the source repository. A standalone native Linux installer is **not included yet**.
 
 The recommended installation method is `.exe` for Windows and **pipx** for Linux, which installs the application into an isolated environment and exposes its command on your `PATH`. This also keeps Lau-PyDE's dependencies separate from the operating system's Python environment.
 
