@@ -1633,19 +1633,37 @@ class MainWindow(QMainWindow):
         url = select_download_url(release, current_platform())
         dialog = QDialog(self)
         dialog.setWindowTitle("Lau-PyDE update available")
-        dialog.setMinimumWidth(480)
-        dialog.setMaximumHeight(460)
+        dialog.setObjectName("updateDialog")
+        screen = dialog.screen() or self.screen()
+        available = screen.availableGeometry() if screen else None
+        width = min(680, max(460, int(available.width() * 0.52))) if available else 560
+        height = min(560, max(360, int(available.height() * 0.62))) if available else 460
+        dialog.resize(width, height)
+        dialog.setMinimumSize(420, 340)
+        dialog.setStyleSheet("""
+            QDialog#updateDialog { background: #202124; }
+            QLabel#updateSummary { color: #e8eaed; font-size: 13px; padding: 2px 4px 6px; }
+            QTextBrowser#updateNotes { background: #292a2d; color: #d8dbe0; border: 1px solid #3b3d42; border-radius: 8px; padding: 10px; font-size: 12px; }
+            QDialogButtonBox QPushButton { min-width: 116px; padding: 7px 14px; border-radius: 6px; color: #e8eaed; background: #35363a; border: 1px solid #4a4d52; }
+            QDialogButtonBox QPushButton:hover { background: #414349; }
+            QDialogButtonBox QPushButton:default { background: #1976d2; border-color: #3289df; }
+        """)
         layout = QVBoxLayout(dialog)
-        summary = QLabel(f"Lau-PyDE {release.version} is available (you have {APP_VERSION}).")
+        layout.setContentsMargins(18, 16, 18, 14)
+        layout.setSpacing(10)
+        summary = QLabel(f"Lau-PyDE {release.version} is available  •  installed {APP_VERSION}")
+        summary.setObjectName("updateSummary")
         summary.setWordWrap(True)
         layout.addWidget(summary)
         notes_view = QTextBrowser(dialog)
+        notes_view.setObjectName("updateNotes")
         notes_view.setOpenExternalLinks(True)
-        notes_view.setMarkdown(f"# Lau-PyDE {release.version}\n\n{notes}")
+        notes_view.setMarkdown(f"## What’s new in Lau-PyDE {release.version}\n\n{notes}")
         layout.addWidget(notes_view, 1)
         buttons = QDialogButtonBox(dialog)
         download = buttons.addButton("Download Update", QDialogButtonBox.AcceptRole)
         close = buttons.addButton("Close", QDialogButtonBox.RejectRole)
+        download.setDefault(True)
         download.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url or RELEASE_PAGE)))
         download.clicked.connect(dialog.accept)
         close.clicked.connect(dialog.reject)
