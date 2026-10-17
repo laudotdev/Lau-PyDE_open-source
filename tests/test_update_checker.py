@@ -8,6 +8,7 @@ from core.update_checker import (
     compare_versions,
     parse_release,
     select_download_url,
+    DOWNLOADS_PAGE,
 )
 
 
@@ -70,6 +71,6 @@ def test_draft_prerelease_and_missing_metadata_are_rejected():
 def test_platform_asset_selection_falls_back_to_release_page():
     release = ReleaseInfo("1.2.0", "", "", "https://example/release", (("app.pkg.tar.zst", "https://example/pkg"),))
     assert select_download_url(release, "arch") == "https://example/pkg"
-    assert select_download_url(release, "windows") == "https://example/release"
-    assert select_download_url(release, "linux") == "https://example/release"
+    assert select_download_url(release, "windows") == DOWNLOADS_PAGE
+    assert select_download_url(release, "linux") == DOWNLOADS_PAGE
 

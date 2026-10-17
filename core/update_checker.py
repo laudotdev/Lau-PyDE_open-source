@@ -13,6 +13,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 REPOSITORY = "laudotdev/Lau-PyDE_open-source"
 RELEASES_URL = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
 RELEASE_PAGE = f"https://github.com/{REPOSITORY}/releases/latest"
+DOWNLOADS_PAGE = "https://laupyde.online/#download"
 VERSION_PATTERN = re.compile(r"^(?:Lau-PyDE_)?v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:[-+].*)?$", re.IGNORECASE)
 
 
@@ -73,7 +74,7 @@ def select_download_url(release: ReleaseInfo, platform: str) -> str:
         for name, url in release.assets:
             if name.lower().endswith(suffixes):
                 return url
-    return release.page_url
+    return DOWNLOADS_PAGE
 
 
 def fetch_latest_release(opener: Callable = urlopen, timeout: float = 8.0) -> ReleaseInfo:
