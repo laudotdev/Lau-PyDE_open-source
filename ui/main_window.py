@@ -2,11 +2,12 @@ from pathlib import Path
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from typing import Optional
 
-from PySide6.QtCore import Qt, QSettings, QThread, QUrl, QProcess
+from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
 from PySide6.QtWidgets import QTextEdit
@@ -176,6 +177,7 @@ class MainWindow(QMainWindow):
         self._project_root_permission_granted = False
         self._update_thread = None
         self._update_worker = None
+        self._update_manual = False
         self._last_update_version = None
 
         self.resize(1200, 800)
@@ -1603,10 +1605,11 @@ class MainWindow(QMainWindow):
             return
         self._update_thread = QThread(self)
         self._update_worker = UpdateWorker()
+        self._update_manual = manual
         self._update_worker.moveToThread(self._update_thread)
         self._update_thread.started.connect(self._update_worker.run)
-        self._update_worker.finished.connect(lambda release: self._update_result(release, manual))
-        self._update_worker.failed.connect(lambda error: self._update_failed(error, manual))
+        self._update_worker.finished.connect(self._update_result_from_worker)
+        self._update_worker.failed.connect(self._update_failed_from_worker)
         self._update_worker.finished.connect(self._update_thread.quit)
         self._update_worker.failed.connect(self._update_thread.quit)
         self._update_thread.finished.connect(self._update_worker.deleteLater)
@@ -1623,9 +1626,23 @@ class MainWindow(QMainWindow):
     def _open_update_url(self, url: str) -> None:
         target = url or RELEASE_PAGE
         if sys.platform.startswith("linux"):
-            QProcess.startDetached("xdg-open", [target])
+            try:
+                subprocess.Popen(
+                    ["xdg-open", target],
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except OSError:
+                self.statusBar().showMessage("Could not open the update link")
             return
         QDesktopServices.openUrl(QUrl(target))
+
+    def _update_result_from_worker(self, release) -> None:
+        self._update_result(release, self._update_manual)
+
+    def _update_failed_from_worker(self, error: str) -> None:
+        self._update_failed(error, self._update_manual)
 
     def _update_result(self, release, manual: bool) -> None:
         comparison = compare_versions(release.version, APP_VERSION)
@@ -1676,7 +1693,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(buttons)
         result = dialog.exec()
         if result == QDialog.Accepted:
-            self._open_update_url(url)
+            QTimer.singleShot(0, lambda: self._open_update_url(url))
 
     def _update_failed(self, _error: str, manual: bool) -> None:
         self.statusBar().showMessage("Update check unavailable")
