@@ -1626,7 +1626,7 @@ class MainWindow(QMainWindow):
             if manual:
                 QMessageBox.information(self, APP_NAME, f"Lau-PyDE {APP_VERSION} is up to date.")
             return
-        if release.version == self._last_update_version:
+        if not manual and release.version == self._last_update_version:
             return
         self._last_update_version = release.version
         notes = release.notes[:800] or "No release notes were provided."
