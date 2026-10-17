@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Lau-PyDE
+Comment=A simple and lightweight Python Development Environment
+Exec=lau-pyde
+Icon=lau-pyde
+Terminal=false
+Categories=Development;IDE;
+StartupWMClass=Lau-PyDE
