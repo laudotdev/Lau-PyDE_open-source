@@ -6,7 +6,7 @@ import sys
 import time
 from typing import Optional
 
-from PySide6.QtCore import Qt, QSettings, QThread, QUrl
+from PySide6.QtCore import Qt, QSettings, QThread, QUrl, QProcess
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
 from PySide6.QtWidgets import QTextEdit
@@ -1620,6 +1620,13 @@ class MainWindow(QMainWindow):
         self._update_thread = None
         self._update_worker = None
 
+    def _open_update_url(self, url: str) -> None:
+        target = url or RELEASE_PAGE
+        if sys.platform.startswith("linux"):
+            QProcess.startDetached("xdg-open", [target])
+            return
+        QDesktopServices.openUrl(QUrl(target))
+
     def _update_result(self, release, manual: bool) -> None:
         comparison = compare_versions(release.version, APP_VERSION)
         if comparison is None or comparison <= 0:
@@ -1669,7 +1676,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(buttons)
         result = dialog.exec()
         if result == QDialog.Accepted:
-            QDesktopServices.openUrl(QUrl(url or RELEASE_PAGE))
+            self._open_update_url(url)
 
     def _update_failed(self, _error: str, manual: bool) -> None:
         self.statusBar().showMessage("Update check unavailable")
