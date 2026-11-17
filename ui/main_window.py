@@ -7,7 +7,7 @@ import sys
 import time
 from typing import Optional
 
-from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl
+from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl, QFileInfo, QMimeDatabase
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
 from PySide6.QtWidgets import QTextEdit
@@ -26,12 +26,14 @@ from PySide6.QtWidgets import (
     QSplitter,
     QLineEdit,
     QTabWidget,
+    QTabBar,
+    QFileIconProvider,
     QVBoxLayout,
     QWidget,
     QStackedWidget,
     
 )
-from PySide6.QtGui import QShortcut, QDesktopServices
+from PySide6.QtGui import QShortcut, QDesktopServices, QIcon
 from ui.panel_icons import panel_icon, ICON_SIZE
 
 from core.file_manager import read_file, write_file
@@ -171,6 +173,7 @@ class MainWindow(QMainWindow):
         # directory when running a file).
         self._current_file_path: Optional[str] = None
         self._current_folder: Optional[str] = None
+        self._file_icon_provider = QFileIconProvider()
         self._maximized_pane: Optional[str] = None
         self._explorer_minimized = False
         self._bottom_minimized = False
@@ -191,6 +194,11 @@ class MainWindow(QMainWindow):
         self._autosave_timer.setInterval(10 * 1000)
         self._autosave_timer.timeout.connect(self._maybe_autosave)
         self._autosave_timer.start()
+        self._autosave_debounce_timer = QTimer(self)
+        self._autosave_debounce_timer.setSingleShot(True)
+        self._autosave_debounce_timer.setInterval(300)
+        self._autosave_debounce_timer.timeout.connect(self._autosave_current_file)
+        self.editor.textChanged.connect(self._schedule_autosave)
 
         # Startup recovery prompts are intentionally disabled: Lau-PyDE now
         # auto-saves the current editor content when a file is run, rather than
@@ -252,9 +260,27 @@ class MainWindow(QMainWindow):
         editor_container_layout = QVBoxLayout(self._editor_container)
         editor_container_layout.setContentsMargins(0, 0, 0, 0)
         editor_container_layout.setSpacing(0)
+        self._file_tab_bar = QTabBar()
+        self._file_tab_bar.setDocumentMode(True)
+        self._file_tab_bar.setExpanding(False)
+        self._file_tab_bar.setMovable(True)
+        self._file_tab_bar.setTabsClosable(True)
+        self._file_tab_bar.currentChanged.connect(self._on_file_tab_changed)
+        self._file_tab_bar.tabCloseRequested.connect(self._close_file_tab)
+        self._file_tab_bar.hide()
+        editor_container_layout.addWidget(self._file_tab_bar)
         editor_container_layout.addWidget(editor_header)
         editor_container_layout.addWidget(self._search_bar)
-        editor_container_layout.addWidget(self.editor)
+        self._markdown_preview = QTextBrowser()
+        self._markdown_preview.setOpenLinks(False)
+        self._markdown_preview.setOpenExternalLinks(False)
+        self._editor_tabs = QTabWidget()
+        self._editor_tabs.addTab(self.editor, "Editor")
+        self._editor_tabs.addTab(self._markdown_preview, "Markdown Preview")
+        self._editor_tabs.setTabVisible(1, False)
+        self._editor_tabs.currentChanged.connect(self._refresh_markdown_preview)
+        self.editor.textChanged.connect(self._refresh_markdown_preview)
+        editor_container_layout.addWidget(self._editor_tabs)
 
         # starting code for the welcome message
         # Welcome screen
@@ -714,6 +740,7 @@ class MainWindow(QMainWindow):
         run_menu = menu_bar.addMenu("&Run")
 
         run_action = QAction("Run File", self)
+        self._run_action = run_action
         run_action.setShortcut(QKeySequence("Ctrl+R"))
         run_action.triggered.connect(self.run_file)
         run_menu.addAction(run_action)
@@ -723,6 +750,7 @@ class MainWindow(QMainWindow):
         self._stop_running_action.setEnabled(False)
         self._stop_running_action.triggered.connect(self.stop_running)
         run_menu.addAction(self._stop_running_action)
+        self._update_run_controls()
 
         # view menu
         view_menu = menu_bar.addMenu("&View")
@@ -921,9 +949,6 @@ class MainWindow(QMainWindow):
             return False
 
     def new_file(self) -> None:
-        if not self._confirm_discard_changes():
-            return
-
         default_dir = Path(self._current_folder) if self._current_folder else Path.home()
         if not default_dir.exists():
             default_dir = Path.home()
@@ -931,7 +956,7 @@ class MainWindow(QMainWindow):
         file_name, ok = QInputDialog.getText(
             self,
             "New File",
-            "File name (.py):",
+            "File name (include extension):",
             text="untitled.py",
         )
 
@@ -941,7 +966,7 @@ class MainWindow(QMainWindow):
         clean_name = (file_name or "untitled.py").strip()
         if not clean_name:
             clean_name = "untitled.py"
-        if not clean_name.endswith(".py"):
+        if not Path(clean_name).suffix:
             clean_name = f"{clean_name}.py"
 
         target_path = default_dir / clean_name
@@ -964,11 +989,7 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self.editor.clear()
-        self._show_editor()
-        self._current_file_path = str(target_path)
-        self.editor.document().setModified(False)
-        self._update_title()
+        self.open_file(str(target_path))
         self.statusBar().showMessage(f"New file: {target_path}")
 
     def new_folder(self) -> None:
@@ -1045,11 +1066,7 @@ class MainWindow(QMainWindow):
                         f"Could not create starter file:\n{file_path}\n\n{error}",
                     )
                     return
-                self._current_file_path = str(file_path)
-                self.editor.setPlainText("")
-                self.editor.document().setModified(False)
-                self._show_editor()
-                self._update_title()
+                self.open_file(str(file_path))
                 self.statusBar().showMessage(f"Project folder opened: {folder}")
                 return
 
@@ -1058,11 +1075,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Project folder opened: {folder}")
 
     def open_file_dialog(self) -> None:
-        if not self._confirm_discard_changes():
-            return
         start_dir = self._current_folder or str(Path.home())
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open File", start_dir, "Python Files (*.py);;All Files (*)"
+            self,
+            "Open File",
+            start_dir,
+            "Supported Files (*.py *.txt *.html *.htm *.css *.js *.mjs *.cjs *.md *.json *.yaml *.yml *.cfg *.toml *.c *.h *.cc *.cpp *.cxx *.hpp *.hh *.java);;All Files (*)",
         )
         if path:
             self.open_file(path)
@@ -1070,16 +1088,38 @@ class MainWindow(QMainWindow):
     def open_file(self, path: str) -> None:
         """Open a specific file path in the editor. Used both by the
         Open dialog and by double-clicking a file in the explorer."""
+        path = str(Path(path).expanduser().resolve())
+        if path == self._current_file_path:
+            self._show_editor()
+            return
+
         try:
-            content = read_file(path)
+            read_file(path)
         except OSError as error:
             QMessageBox.critical(self, APP_NAME, f"Could not open file:\n{path}\n\n{error}")
             return
 
+        if (self._current_file_path or self.editor.document().isModified()) and not self.save_file():
+            return
+
+        existing_index = next(
+            (
+                index
+                for index in range(self._file_tab_bar.count())
+                if self._file_tab_bar.tabData(index) == path
+            ),
+            -1,
+        )
+        if existing_index >= 0:
+            self._file_tab_bar.setCurrentIndex(existing_index)
+        else:
+            tab_index = self._file_tab_bar.addTab(self._file_icon(path), Path(path).name)
+            self._file_tab_bar.setTabData(tab_index, path)
+            self._file_tab_bar.setTabToolTip(tab_index, path)
+            self._file_tab_bar.setCurrentIndex(tab_index)
+            self._on_file_tab_changed(tab_index)
+        self._file_tab_bar.show()
         self._show_editor()
-        self.editor.setPlainText(content)
-        self._current_file_path = path
-        self.editor.document().setModified(False)
 
         # reveal the file in the explorer tree
         try:
@@ -1100,6 +1140,107 @@ class MainWindow(QMainWindow):
 
         self._update_title()
         self.statusBar().showMessage(f"Opened {path}")
+
+    def _on_file_tab_changed(self, index: int) -> None:
+        if index < 0:
+            return
+        path = self._file_tab_bar.tabData(index)
+        if not path or path == self._current_file_path:
+            return
+
+        previous_path = self._current_file_path
+        if (previous_path or self.editor.document().isModified()) and not self.save_file():
+            previous_index = next(
+                (
+                    tab_index
+                    for tab_index in range(self._file_tab_bar.count())
+                    if self._file_tab_bar.tabData(tab_index) == previous_path
+                ),
+                -1,
+            )
+            if previous_index >= 0:
+                self._file_tab_bar.setCurrentIndex(previous_index)
+            return
+
+        try:
+            content = read_file(path)
+        except OSError as error:
+            QMessageBox.critical(self, APP_NAME, f"Could not open file:\n{path}\n\n{error}")
+            if previous_path:
+                previous_index = next(
+                    tab_index
+                    for tab_index in range(self._file_tab_bar.count())
+                    if self._file_tab_bar.tabData(tab_index) == previous_path
+                )
+                self._file_tab_bar.setCurrentIndex(previous_index)
+            return
+
+        self._current_file_path = path
+        self.editor.set_file_path(path)
+        self.editor.setPlainText(content)
+        self.editor.document().setModified(False)
+        self._refresh_markdown_preview()
+        self._show_editor()
+        try:
+            self.explorer.reveal_path(path)
+        except Exception:
+            pass
+        if self._current_folder:
+            RECENT_PROJECT_FILE.write_text(
+                json.dumps({"project": self._current_folder, "file": path})
+            )
+        self._update_title()
+        self.statusBar().showMessage(f"Opened {path}")
+
+    def _file_icon(self, path: str) -> QIcon:
+        suffix = Path(path).suffix.lower()
+        icon_names = {
+            ".html": "file-html.svg", ".htm": "file-html.svg",
+            ".css": "file-css.svg", ".js": "file-js.svg",
+            ".mjs": "file-js.svg", ".cjs": "file-js.svg",
+            ".md": "file-md.svg", ".json": "file-json.svg",
+            ".yaml": "file-yaml.svg", ".yml": "file-yaml.svg",
+            ".toml": "file-toml.svg", ".c": "file-code.svg",
+            ".h": "file-code.svg", ".cc": "file-code.svg",
+            ".cpp": "file-code.svg", ".cxx": "file-code.svg",
+            ".hpp": "file-code.svg", ".hh": "file-code.svg",
+            ".java": "file-code.svg",
+        }
+        if suffix in icon_names:
+            icon_path = Path(__file__).resolve().parent.parent / "assets" / "icons" / icon_names[suffix]
+            return QIcon(str(icon_path))
+        icon = self._file_icon_provider.icon(QFileInfo(path))
+        if icon.isNull():
+            mime_type = QMimeDatabase().mimeTypeForFile(path)
+            icon = QIcon.fromTheme(mime_type.iconName())
+        return icon
+
+    def _close_file_tab(self, index: int) -> None:
+        closing_path = self._file_tab_bar.tabData(index)
+        if closing_path == self._current_file_path and self.editor.document().isModified():
+            if not self.save_file():
+                return
+        self._file_tab_bar.removeTab(index)
+        if self._file_tab_bar.count() == 0:
+            self._current_file_path = None
+            self.editor.set_file_path(None)
+            self.editor.clear()
+            self._file_tab_bar.hide()
+            self._refresh_markdown_preview()
+            self._update_title()
+
+    def _refresh_markdown_preview(self, *_args) -> None:
+        if not hasattr(self, "_editor_tabs"):
+            return
+        is_markdown = bool(
+            self._current_file_path
+            and Path(self._current_file_path).suffix.lower() == ".md"
+        )
+        self._editor_tabs.setTabVisible(1, is_markdown)
+        if not is_markdown and self._editor_tabs.currentWidget() is self._markdown_preview:
+            self._editor_tabs.setCurrentWidget(self.editor)
+        if is_markdown:
+            self._markdown_preview.setMarkdown(self.editor.toPlainText())
 
     def open_folder_dialog(self) -> None:
         start_dir = self._current_folder or str(Path.home())
@@ -1128,10 +1269,15 @@ class MainWindow(QMainWindow):
 
     def close_project(self) -> None:
         """Close the current project workspace."""
+        self._file_tab_bar.blockSignals(True)
+        while self._file_tab_bar.count():
+            self._file_tab_bar.removeTab(0)
+        self._file_tab_bar.blockSignals(False)
+        self._file_tab_bar.hide()
         self._current_folder = None
         self._current_file_path = None
-
-        
+        self.editor.set_file_path(None)
+        self._refresh_markdown_preview()
 
         # remove the current project folder from the IDE and set to None
         self.explorer.set_root_folder(None)
@@ -1164,6 +1310,7 @@ class MainWindow(QMainWindow):
             )
             return False
 
+        self.editor.set_file_path(self._current_file_path)
         self.editor.document().setModified(False)
         self._update_title()
         self.statusBar().showMessage(f"Saved {self._current_file_path}")
@@ -1221,11 +1368,16 @@ class MainWindow(QMainWindow):
     def save_file_as(self) -> bool:
         start_dir = self._current_folder or str(Path.home())
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save As", start_dir, "Python Files (*.py);;All Files (*)"
+            self,
+            "Save As",
+            start_dir,
+            "Supported Files (*.py *.txt *.html *.htm *.css *.js *.mjs *.cjs *.md *.json *.yaml *.yml *.cfg *.toml *.c *.h *.cc *.cpp *.cxx *.hpp *.hh *.java);;All Files (*)",
         )
         if not path:
             return False
         self._current_file_path = path
+        self.editor.set_file_path(path)
+        self._refresh_markdown_preview()
         return self.save_file()
 
     def _confirm_discard_changes(self) -> bool:
@@ -1250,11 +1402,20 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, APP_NAME, "A program is already running.")
             return
 
+        if self._current_file_path and Path(self._current_file_path).suffix.lower() != ".py":
+            QMessageBox.information(self, APP_NAME, "Only Python files can be run in Lau-PyDE.")
+            return
+
         # the file has to exist on disk before we can run it as a file,
         # so save first (prompting for a location if it's a new file).
         if self._current_file_path is None or self.editor.document().isModified():
             if not self.save_file():
                 return  # user cancelled the save
+
+        if not self._current_file_path or Path(self._current_file_path).suffix.lower() != ".py":
+            QMessageBox.information(self, APP_NAME, "Only Python files can be run in Lau-PyDE.")
+            self._update_run_controls()
+            return
 
         working_dir = self._current_folder or str(Path(self._current_file_path).parent)
 
@@ -1340,13 +1501,32 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Killed")
 
     def _set_running_controls(self, running: bool) -> None:
-        self._stop_running_button.setEnabled(True)
-        self._stop_running_button.setIcon(panel_icon("stop" if running else "play"))
-        self._stop_running_button.setToolTip(
-            "Stop the running Python program" if running
-            else "Run the current Python file"
-        )
+        self._update_run_controls(running)
         self._stop_running_action.setEnabled(running)
+
+    def _update_run_controls(self, running: bool | None = None) -> None:
+        if running is None:
+            running = self._runner.is_running() if hasattr(self, "_runner") else False
+        can_run = (
+            self._current_file_path is None
+            or Path(self._current_file_path).suffix.lower() == ".py"
+        )
+        if hasattr(self, "_stop_running_button"):
+            self._stop_running_button.setEnabled(running or can_run)
+            self._stop_running_button.setIcon(panel_icon("stop" if running else "play"))
+            self._stop_running_button.setToolTip(
+                "Stop the running Python program" if running
+                else "Run the current Python file" if can_run
+                else "Only Python files can be run"
+            )
+        if hasattr(self, "_run_action"):
+            self._run_action.setEnabled(not running and can_run)
+            self._run_action.setToolTip(
+                "Run the current Python file" if can_run
+                else "Only Python files can be run"
+            )
+        if hasattr(self, "_stop_running_action"):
+            self._stop_running_action.setEnabled(running)
     def _append_error_output(self, text: str) -> None:
         self.output_panel.moveCursor(QTextCursor.End)
         cursor = self.output_panel.textCursor()
@@ -1566,6 +1746,25 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _schedule_autosave(self) -> None:
+        if self.editor.document().isModified():
+            self._autosave_debounce_timer.start()
+
+    def _autosave_current_file(self) -> None:
+        if not self.editor.document().isModified():
+            return
+        content = self.editor.toPlainText()
+        if not self._current_file_path:
+            return
+        try:
+            write_file(self._current_file_path, content)
+        except OSError as error:
+            self.statusBar().showMessage(f"Autosave failed: {error}")
+            return
+        self.editor.document().setModified(False)
+        self._update_title()
+        self.statusBar().showMessage(f"Autosaved {self._current_file_path}", 2000)
+
     def _git_push(self) -> None:
         """Run `git push` in the current project folder using the terminal.
 
@@ -1741,6 +1940,7 @@ class MainWindow(QMainWindow):
         self._file_label.setText(name)
         self._error_badge.setText(f"{error_count}" if error_count > 0 else "")
         self.setWindowTitle(f"{title} — {APP_NAME}")
+        self._update_run_controls()
 
     def _set_line_number_mode(self, mode: str, persist: bool = True) -> None:
         """Apply the line-number mode and remember it for the next launch."""

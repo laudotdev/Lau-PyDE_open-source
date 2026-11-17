@@ -98,7 +98,12 @@ class FileExplorer(QWidget):
         super().__init__()
 
         self._model = QFileSystemModel()
-        self._model.setNameFilters(["*.py", "*.txt", "*.md", "*.json", "*.cfg", "*.toml"])
+        self._model.setNameFilters([
+            "*.py", "*.txt", "*.html", "*.htm", "*.css", "*.js", "*.mjs",
+            "*.cjs", "*.md", "*.json", "*.yaml", "*.yml", "*.cfg", "*.toml",
+            "*.c", "*.h", "*.cc", "*.cpp", "*.cxx", "*.hpp", "*.hh",
+            "*.java",
+        ])
         # Keep folders visible while filtering file names so the user can
         # browse the full directory hierarchy (expand/collapse folders).
         self._model.setNameFilterDisables(True)

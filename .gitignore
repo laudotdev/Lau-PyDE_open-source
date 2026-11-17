@@ -4,7 +4,8 @@
 !.env.example
 
 # Tests and local test fixtures
-tests/
+tests/*
+!tests/test_editor_languages.py
 test_inline_input.py
 
 # IDE/editor metadata

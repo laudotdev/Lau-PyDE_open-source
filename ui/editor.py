@@ -1,7 +1,9 @@
 import ast
 import difflib
+import re
 import tokenize
 from io import StringIO
+from pathlib import Path
 from PySide6.QtCore import QRect, QRegularExpression, QSize, Qt, Signal, QTimer, QPoint, QEvent
 from PySide6.QtGui import (
     QColor,
@@ -42,6 +44,27 @@ MODULE_ATTRS = {
     "math": ["sqrt", "sin", "cos", "tan", "pi", "e"],
     "json": ["load", "loads", "dump", "dumps"],
     "pathlib": ["Path", "PurePath"],
+}
+
+SOURCE_KEYWORDS = {
+    "html": ["a", "article", "aside", "body", "button", "div", "doctype", "footer", "form", "h1", "h2", "h3", "head", "header", "html", "img", "input", "label", "li", "link", "main", "meta", "nav", "ol", "option", "p", "section", "script", "select", "span", "style", "table", "td", "textarea", "th", "title", "tr", "ul"],
+    "css": ["align-items", "background", "border", "color", "display", "flex", "font", "grid", "height", "justify-content", "margin", "padding", "position", "width"],
+    "javascript": ["async", "await", "break", "case", "catch", "class", "const", "continue", "default", "else", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "let", "new", "null", "return", "switch", "this", "throw", "true", "try", "typeof", "var", "while"],
+    "markdown": ["heading", "link", "image", "code", "list", "quote"],
+    "json": ["false", "null", "true"],
+    "yaml": ["false", "no", "null", "true", "yes"],
+    "toml": ["false", "true"],
+    "c": ["auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern", "float", "for", "if", "int", "long", "return", "short", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "while"],
+    "cpp": ["auto", "bool", "break", "case", "catch", "class", "const", "continue", "default", "delete", "else", "false", "for", "if", "include", "int", "namespace", "new", "nullptr", "public", "return", "std", "struct", "switch", "template", "this", "true", "try", "using", "void", "while"],
+    "java": ["abstract", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "default", "do", "double", "else", "extends", "final", "finally", "float", "for", "if", "implements", "import", "instanceof", "int", "interface", "long", "new", "package", "private", "protected", "public", "return", "static", "super", "switch", "this", "throw", "throws", "try", "void", "while"],
+}
+
+EXTENSION_LANGUAGES = {
+    ".htm": "html", ".html": "html", ".css": "css",
+    ".js": "javascript", ".mjs": "javascript", ".cjs": "javascript",
+    ".md": "markdown", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
+    ".toml": "toml", ".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp",
+    ".cxx": "cpp", ".hh": "cpp", ".hpp": "cpp", ".java": "java",
 }
 
 
@@ -119,6 +142,59 @@ class PythonHighlighter(QSyntaxHighlighter):
         while comment_iterator.hasNext():
             match = comment_iterator.next()
             self.setFormat(match.capturedStart(), match.capturedLength(), self._comment_format)
+
+
+class SourceHighlighter(QSyntaxHighlighter):
+    def __init__(self, document, language: str):
+        super().__init__(document)
+        self.language = language
+        self._rules = []
+
+        def add(pattern: str, color: str, bold: bool = False) -> None:
+            text_format = QTextCharFormat()
+            text_format.setForeground(QColor(color))
+            if bold:
+                text_format.setFontWeight(QFont.Bold)
+            self._rules.append((QRegularExpression(pattern), text_format))
+
+        keywords = SOURCE_KEYWORDS.get(language, [])
+        if keywords:
+            keyword_color = {
+                "css": "#45c7b8",
+                "javascript": "#ff6b9d",
+            }.get(language, "#c586c0")
+            add(r"\b(?:" + "|".join(re.escape(word) for word in keywords) + r")\b", keyword_color, True)
+        number_color = {"css": "#b8df6f", "javascript": "#b8df6f"}.get(language, "#b5cea8")
+        string_color = {"css": "#f4a261", "javascript": "#ffd580"}.get(language, "#ce9178")
+        comment_color = {"css": "#77c7a6", "javascript": "#77c7a6"}.get(language, "#6a9955")
+        add(r"\b\d+(?:\.\d+)?\b", number_color)
+        add(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"|`[^`]*`", string_color)
+        if language in {"javascript", "css", "c", "cpp", "java"}:
+            add(r"//[^\n]*|/\*.*?\*/", comment_color)
+        if language == "html":
+            add(r"<!--.*?-->", "#77c7a6")
+            add(r"</?[A-Za-z][^>]*>", "#4fc3f7", True)
+        elif language == "css":
+            add(r"^[ \t]*[-\w]+(?=\s*:)", "#45c7b8")
+            add(r"^[^{]+(?=\s*\{)", "#ff9f68")
+            add(r"@[\w-]+", "#d8a7ff", True)
+        elif language == "javascript":
+            add(r"\bfunction\s+([A-Za-z_$][\w$]*)", "#82aaff", True)
+            add(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)", "#f2cc60")
+        elif language == "markdown":
+            add(r"^\s{0,3}#{1,6}\s+.*$", "#569cd6", True)
+            add(r"`[^`]+`", "#ce9178")
+            add(r"!?\[[^]]*\]\([^)]*\)", "#4ec9b0")
+        elif language in {"json", "yaml", "toml"}:
+            add(r"^[ \t]*[\w.-]+(?=\s*:|\s*=)", "#9cdcfe")
+            add(r"\b(?:true|false|null)\b", "#569cd6", True)
+
+    def highlightBlock(self, text: str) -> None:
+        for pattern, text_format in self._rules:
+            matches = pattern.globalMatch(text)
+            while matches.hasNext():
+                match = matches.next()
+                self.setFormat(match.capturedStart(), match.capturedLength(), text_format)
 
 
 class LineNumberArea(QWidget):
@@ -208,6 +284,9 @@ class CodeEditor(QPlainTextEdit):
         self._keyword_errors = []
         self._name_errors = []
         self._parse_error_message: str | None = None
+        self._source_diagnostics: list[str] = []
+        self._language = "python"
+        self._is_python_file = True
 
         # Code editors traditionally scroll sideways rather than wrap.
         self.setLineWrapMode(QPlainTextEdit.NoWrap)
@@ -250,9 +329,27 @@ class CodeEditor(QPlainTextEdit):
         # now safe to connect textChanged
         self.textChanged.connect(self._check_errors)
 
+    def set_file_path(self, path: str | None) -> None:
+        suffix = Path(path).suffix.lower() if path else ".py"
+        language = EXTENSION_LANGUAGES.get(suffix, "python" if suffix == ".py" else "text")
+        if language != self._language:
+            self._highlighter.setDocument(None)
+            self._highlighter.deleteLater()
+            self._highlighter = (
+                PythonHighlighter(self.document())
+                if language == "python"
+                else SourceHighlighter(self.document(), language)
+            )
+            self._language = language
+        self._is_python_file = language == "python"
+        self._check_errors()
+
     def get_error_messages(self) -> list[str]:
         """Return human-readable error messages for all current issues."""
         self._check_errors()
+
+        if not self._is_python_file:
+            return self._source_diagnostics.copy()
 
         messages: list[str] = []
 
@@ -394,6 +491,21 @@ class CodeEditor(QPlainTextEdit):
         self._keyword_errors = []
         self._name_errors = []
         self._parse_error_message = None
+        self._source_diagnostics = []
+
+        if not self._is_python_file:
+            words = set(re.findall(r"\b[A-Za-z_$][\w$]*\b", code))
+            words.update(SOURCE_KEYWORDS.get(self._language, []))
+            self._completion_model.setStringList(sorted(words)[:200])
+            self._source_diagnostics = self._diagnose_source(code)
+            self._highlight_current_line()
+            self._line_number_area.update()
+            diag_count = len(self._source_diagnostics)
+            if diag_count != self._last_diag_count:
+                self._last_diag_count = diag_count
+                self.diagnostics_changed.emit(diag_count)
+            return
+
         seen_syntax = set()
         seen_keyword = set()
         seen_name = set()
@@ -628,6 +740,57 @@ class CodeEditor(QPlainTextEdit):
         except Exception:
             pass
 
+    def _diagnose_source(self, code: str) -> list[str]:
+        diagnostics = []
+        if self._language == "markdown":
+            fences = re.findall(r"(?m)^\s*(```+|~~~+)", code)
+            if len(fences) % 2:
+                diagnostics.append("Unclosed Markdown code fence.")
+        elif self._language == "html":
+            void_tags = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+            optional_close = {"dd", "dt", "li", "option", "optgroup", "p", "td", "th", "tr"}
+            stack = []
+            for match in re.finditer(r"</?([A-Za-z][\w:-]*)\b[^>]*>", code):
+                tag = match.group(1).lower()
+                raw_tag = match.group(0)
+                line = code.count("\n", 0, match.start()) + 1
+                if raw_tag.startswith("</"):
+                    if stack and stack[-1][0] == tag:
+                        stack.pop()
+                    elif tag in optional_close and any(item[0] == tag for item in stack):
+                        while stack and stack[-1][0] != tag:
+                            stack.pop()
+                        if stack:
+                            stack.pop()
+                    else:
+                        diagnostics.append(f"Line {line}: Unexpected closing </{tag}> tag.")
+                elif tag not in void_tags and not raw_tag.rstrip().endswith("/>"):
+                    stack.append((tag, line))
+            for tag, line in stack:
+                diagnostics.append(f"Line {line}: <{tag}> is not closed.")
+        elif self._language in {"css", "javascript"}:
+            source = re.sub(
+                r"(?s)/\*.*?\*/|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`",
+                " ",
+                code,
+            )
+            source = re.sub(r"//[^\n]*", " ", source)
+            pairs = {"(": ")", "[": "]", "{": "}"}
+            stack = []
+            for index, character in enumerate(source):
+                line = source.count("\n", 0, index) + 1
+                if character in pairs:
+                    stack.append((character, line))
+                elif character in pairs.values():
+                    if not stack or pairs[stack[-1][0]] != character:
+                        diagnostics.append(f"Line {line}: Unexpected '{character}'.")
+                        break
+                    stack.pop()
+            if stack:
+                character, line = stack[-1]
+                diagnostics.append(f"Line {line}: '{pairs[character]}' is missing.")
+        return diagnostics
+
     def _word_under_cursor(self) -> str:
         cursor = self.textCursor()
         cursor.select(QTextCursor.WordUnderCursor)
@@ -700,6 +863,89 @@ class CodeEditor(QPlainTextEdit):
             return True
 
         return False
+
+    def _expand_html_boilerplate(self) -> bool:
+        if self.toPlainText().strip() != "!":
+            return False
+
+        template = (
+            "<!DOCTYPE html>\n"
+            '<html lang="en">\n'
+            "<head>\n"
+            '  <meta charset="UTF-8">\n'
+            '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+            "  <title></title>\n"
+            "</head>\n"
+            "<body>\n"
+            "\n"
+            "</body>\n"
+            "</html>"
+        )
+        self.setPlainText(template)
+        cursor = self.textCursor()
+        cursor.setPosition(template.index("\n\n</body>") + 1)
+        self.setTextCursor(cursor)
+        return True
+
+    def _expand_html_abbreviation(self) -> bool:
+        cursor = self.textCursor()
+        line = cursor.block().text()
+        match = re.fullmatch(r"(\s*)(h[1-6]|link:css|input:text)\s*", line, re.IGNORECASE)
+        if not match:
+            return False
+
+        indentation, abbreviation = match.groups()
+        abbreviation = abbreviation.lower()
+        if abbreviation.startswith("h"):
+            tag = abbreviation
+            expansion = f"<{tag}></{tag}>"
+            cursor_offset = len(indentation) + len(tag) + 2
+        elif abbreviation == "link:css":
+            expansion = '<link rel="stylesheet" href="style.css">'
+            cursor_offset = expansion.index("style.css")
+        else:
+            expansion = '<input type="text" class="">'
+            cursor_offset = expansion.index('"">') + 1
+
+        block = cursor.block()
+        cursor.setPosition(block.position())
+        cursor.setPosition(block.position() + len(line), QTextCursor.KeepAnchor)
+        cursor.insertText(indentation + expansion)
+        cursor.setPosition(block.position() + cursor_offset)
+        self.setTextCursor(cursor)
+        return True
+
+    def _complete_html_tag(self) -> bool:
+        cursor = self.textCursor()
+        if cursor.hasSelection():
+            return False
+
+        before_cursor = cursor.block().text()[:cursor.positionInBlock()]
+        match = re.search(r"<([A-Za-z][\w:-]*)(?:\s+[^<>]*)?$", before_cursor)
+        if not match:
+            return False
+
+        typed_tag = match.group(1)
+        tag = typed_tag
+        if self._completer.popup().isVisible():
+            candidate = self._completer.popup().currentIndex().data()
+            if candidate and str(candidate).lower().startswith(typed_tag.lower()):
+                tag = str(candidate)
+        if tag.lower() in {
+            "area", "base", "br", "col", "embed", "hr", "img", "input",
+            "link", "meta", "param", "source", "track", "wbr",
+        }:
+            return False
+
+        closing_tag = f"</{tag}>"
+        replace_start = cursor.block().position() + match.start()
+        replace_end = cursor.position()
+        cursor.setPosition(replace_start)
+        cursor.setPosition(replace_end, QTextCursor.KeepAnchor)
+        cursor.insertText(f"<{tag}>{closing_tag}")
+        cursor.setPosition(replace_start + len(tag) + 2)
+        self.setTextCursor(cursor)
+        return True
 
     def eventFilter(self, watched, event) -> bool:
         if hasattr(self, "_completer") and watched is self._completer.popup():
@@ -812,6 +1058,9 @@ class CodeEditor(QPlainTextEdit):
             return False
         value = popup.currentIndex().data()
         if not value:
+            self._completer.setCurrentRow(0)
+            value = self._completer.currentCompletion()
+        if not value:
             return False
         cursor = self.textCursor()
         cursor.select(QTextCursor.WordUnderCursor)
@@ -839,7 +1088,18 @@ class CodeEditor(QPlainTextEdit):
     def keyPressEvent(self, event) -> None:
         if self.multi_cursor_active and self._handle_multi_cursor_input(event):
             return
+        if self._language == "html":
+            if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Tab) and self.toPlainText().strip() == "!":
+                if self._expand_html_boilerplate():
+                    return
+            if event.key() == Qt.Key_Tab and not (event.modifiers() & Qt.ShiftModifier):
+                if self._complete_html_tag():
+                    return
+            if event.text() == ">" and self._complete_html_tag():
+                return
         if event.key() in (Qt.Key_Tab, Qt.Key_Backtab) and not (event.modifiers() & Qt.ShiftModifier):
+            if self._language == "html" and self._expand_html_abbreviation():
+                return
             if self._accept_completion():
                 return
         if self._handle_auto_pairs(event):
