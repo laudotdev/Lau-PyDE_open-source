@@ -18,6 +18,7 @@ import typing
 
 from PySide6.QtCore import Signal, Qt, QModelIndex, QDir, QUrl
 from ui.panel_icons import panel_icon, ICON_SIZE
+from ui.file_icons import LauPydeFileIconProvider
 from PySide6.QtGui import QColor, QPainter, QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -98,11 +99,12 @@ class FileExplorer(QWidget):
         super().__init__()
 
         self._model = QFileSystemModel()
+        self._model.setIconProvider(LauPydeFileIconProvider())
         self._model.setNameFilters([
             "*.py", "*.txt", "*.html", "*.htm", "*.css", "*.js", "*.mjs",
             "*.cjs", "*.md", "*.json", "*.yaml", "*.yml", "*.cfg", "*.toml",
             "*.c", "*.h", "*.cc", "*.cpp", "*.cxx", "*.hpp", "*.hh",
-            "*.java",
+            "*.java", "*.go", "*.rs",
         ])
         # Keep folders visible while filtering file names so the user can
         # browse the full directory hierarchy (expand/collapse folders).

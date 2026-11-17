@@ -47,7 +47,7 @@ MODULE_ATTRS = {
 }
 
 SOURCE_KEYWORDS = {
-    "html": ["a", "article", "aside", "body", "button", "div", "doctype", "footer", "form", "h1", "h2", "h3", "head", "header", "html", "img", "input", "label", "li", "link", "main", "meta", "nav", "ol", "option", "p", "section", "script", "select", "span", "style", "table", "td", "textarea", "th", "title", "tr", "ul"],
+    "html": ["a", "article", "aside", "body", "button", "div", "doctype", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "html", "img", "input", "label", "li", "link", "main", "meta", "nav", "ol", "option", "p", "section", "script", "select", "span", "style", "table", "td", "textarea", "th", "title", "tr", "ul"],
     "css": ["align-items", "background", "border", "color", "display", "flex", "font", "grid", "height", "justify-content", "margin", "padding", "position", "width"],
     "javascript": ["async", "await", "break", "case", "catch", "class", "const", "continue", "default", "else", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "let", "new", "null", "return", "switch", "this", "throw", "true", "try", "typeof", "var", "while"],
     "markdown": ["heading", "link", "image", "code", "list", "quote"],
@@ -57,6 +57,8 @@ SOURCE_KEYWORDS = {
     "c": ["auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern", "float", "for", "if", "int", "long", "return", "short", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "while"],
     "cpp": ["auto", "bool", "break", "case", "catch", "class", "const", "continue", "default", "delete", "else", "false", "for", "if", "include", "int", "namespace", "new", "nullptr", "public", "return", "std", "struct", "switch", "template", "this", "true", "try", "using", "void", "while"],
     "java": ["abstract", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "default", "do", "double", "else", "extends", "final", "finally", "float", "for", "if", "implements", "import", "instanceof", "int", "interface", "long", "new", "package", "private", "protected", "public", "return", "static", "super", "switch", "this", "throw", "throws", "try", "void", "while"],
+    "go": ["break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough", "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range", "return", "select", "struct", "switch", "type", "var"],
+    "rust": ["as", "async", "await", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while"],
 }
 
 EXTENSION_LANGUAGES = {
@@ -65,6 +67,7 @@ EXTENSION_LANGUAGES = {
     ".md": "markdown", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
     ".toml": "toml", ".c": "c", ".h": "c", ".cc": "cpp", ".cpp": "cpp",
     ".cxx": "cpp", ".hh": "cpp", ".hpp": "cpp", ".java": "java",
+    ".go": "go", ".rs": "rust",
 }
 
 
@@ -890,28 +893,66 @@ class CodeEditor(QPlainTextEdit):
     def _expand_html_abbreviation(self) -> bool:
         cursor = self.textCursor()
         line = cursor.block().text()
-        match = re.fullmatch(r"(\s*)(h[1-6]|link:css|input:text)\s*", line, re.IGNORECASE)
+        match = re.fullmatch(r"(\s*)([a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)?)\s*", line, re.IGNORECASE)
         if not match:
             return False
 
         indentation, abbreviation = match.groups()
-        abbreviation = abbreviation.lower()
-        if abbreviation.startswith("h"):
-            tag = abbreviation
-            expansion = f"<{tag}></{tag}>"
-            cursor_offset = len(indentation) + len(tag) + 2
-        elif abbreviation == "link:css":
+        abbreviation = abbreviation.lower().split(":", 1)
+        tag = abbreviation[0]
+        variant = abbreviation[1] if len(abbreviation) == 2 else None
+        void_tags = {
+            "area", "base", "br", "col", "embed", "hr", "img", "input",
+            "link", "meta", "param", "source", "track", "wbr",
+        }
+        known_tags = set(SOURCE_KEYWORDS["html"]) | {
+            "address", "blockquote", "caption", "code", "dd", "del", "details",
+            "dialog", "dl", "dt", "fieldset", "figcaption", "figure", "iframe",
+            "em", "i", "ins", "kbd", "legend", "mark", "menu", "noscript", "optgroup",
+            "output", "pre", "progress", "small", "summary", "sup", "sub",
+            "strong", "time", "u", "video", "audio", "canvas", "template", "thead", "tbody",
+            "tfoot", "colgroup", "datalist", "picture", "source", "track",
+            "b", "abbr", "acronym", "cite", "data", "dfn", "meter", "ruby", "s", "samp", "var",
+            "marquee", "portal", "search", "slot", "svg",
+        }
+        if tag not in known_tags:
+            return False
+
+        if tag == "link" and variant in (None, "css"):
             expansion = '<link rel="stylesheet" href="style.css">'
             cursor_offset = expansion.index("style.css")
+        elif tag == "input" and variant:
+            allowed_types = {
+                "button", "checkbox", "color", "date", "datetime-local", "email",
+                "file", "hidden", "image", "month", "number", "password", "radio",
+                "range", "reset", "search", "submit", "tel", "text", "time", "url", "week",
+            }
+            if variant not in allowed_types:
+                return False
+            expansion = f'<input type="{variant}" class="">'
+            cursor_offset = expansion.index('class="') + len('class="')
+        elif variant:
+            return False
+        elif tag in void_tags:
+            if tag == "img":
+                expansion = '<img src="" alt="">'
+            elif tag == "input":
+                expansion = '<input type="text" class="">'
+            elif tag == "link":
+                expansion = '<link rel="stylesheet" href="style.css">'
+            else:
+                expansion = f"<{tag}>"
+            cursor_offset = len(expansion)
         else:
-            expansion = '<input type="text" class="">'
-            cursor_offset = expansion.index('"">') + 1
+            expansion = f"<{tag}></{tag}>"
+            cursor_offset = len(tag) + 2
 
         block = cursor.block()
+        block_position = block.position()
         cursor.setPosition(block.position())
         cursor.setPosition(block.position() + len(line), QTextCursor.KeepAnchor)
         cursor.insertText(indentation + expansion)
-        cursor.setPosition(block.position() + cursor_offset)
+        cursor.setPosition(block_position + len(indentation) + cursor_offset)
         self.setTextCursor(cursor)
         return True
 
@@ -1102,6 +1143,14 @@ class CodeEditor(QPlainTextEdit):
                 return
             if self._accept_completion():
                 return
+        if self._language in {"javascript", "css", "c", "cpp", "java", "go", "rust"} and event.text() == "}":
+            cursor = self.textCursor()
+            line_prefix = cursor.block().text()[:cursor.positionInBlock()]
+            if not cursor.hasSelection() and not line_prefix.strip():
+                remove_count = min(4, len(line_prefix) - len(line_prefix.rstrip(" ")))
+                for _ in range(remove_count):
+                    cursor.deletePreviousChar()
+                self.setTextCursor(cursor)
         if self._handle_auto_pairs(event):
             return
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
@@ -1551,6 +1600,26 @@ class CodeEditor(QPlainTextEdit):
         cursor = self.textCursor()
         current_block = cursor.block()
         current_line = current_block.text()
+
+        if self._language in {"javascript", "css", "c", "cpp", "java", "go", "rust"}:
+            position = cursor.positionInBlock()
+            prefix = current_line[:position]
+            suffix = current_line[position:]
+            indentation = re.match(r"^\s*", current_line).group(0)
+            opens_block = prefix.rstrip().endswith(("{", "(", "["))
+            closes_block = suffix.lstrip().startswith(("}", ")", "]"))
+            if opens_block and closes_block:
+                cursor.insertText("\n" + indentation + "    \n" + indentation)
+                cursor.movePosition(QTextCursor.Up)
+                cursor.movePosition(QTextCursor.EndOfLine)
+            else:
+                extra = "    " if opens_block else ""
+                dedent = "    " if not prefix.strip() and suffix.lstrip().startswith("}") else ""
+                if dedent and indentation.endswith(dedent):
+                    indentation = indentation[:-len(dedent)]
+                cursor.insertText("\n" + indentation + extra)
+            self.setTextCursor(cursor)
+            return
 
         # if the current line is empty or only whitespace, try to base the
         # indentation on the previous non-empty line so pressing Enter on a

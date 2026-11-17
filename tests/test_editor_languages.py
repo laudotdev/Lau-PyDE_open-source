@@ -5,6 +5,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QKeyEvent, QTextCursor
+from PySide6.QtCore import QSize
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -70,8 +71,10 @@ def test_html_boilerplate_and_tag_completion_keys(qapp):
     ("abbreviation", "expected"),
     [
         ("h1", "<h1></h1>"),
+        ("section", "<section></section>"),
         ("link:css", '<link rel="stylesheet" href="style.css">'),
         ("input:text", '<input type="text" class="">'),
+        ("input:number", '<input type="number" class="">'),
     ],
 )
 def test_html_abbreviations_expand_on_tab(qapp, abbreviation, expected):
@@ -102,12 +105,98 @@ def test_css_and_javascript_use_distinct_keyword_colors(qapp):
 
 
 def test_file_icons_use_custom_language_artwork(qapp, tmp_path, monkeypatch):
+    from PySide6.QtCore import QFileInfo
     import ui.main_window as main_window_module
+    from ui.file_icons import LauPydeFileIconProvider
 
     monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
     window = MainWindow()
-    for name in ("index.html", "site.css", "app.js", "README.md"):
-        assert not window._file_icon(name).isNull()
+    explorer_provider = window.explorer._model.iconProvider()
+    tab_provider = window._file_icon_provider
+    for name in ("index.html", "site.css", "app.js", "README.md", "Main.java"):
+        path = tmp_path / name
+        path.write_text("", encoding="utf-8")
+        explorer_icon = explorer_provider.icon(QFileInfo(str(path)))
+        tab_icon = tab_provider.icon(QFileInfo(str(path)))
+        assert not explorer_icon.isNull()
+        assert explorer_icon.pixmap(QSize(24, 24)).toImage() == tab_icon.pixmap(QSize(24, 24)).toImage()
+    assert isinstance(explorer_provider, LauPydeFileIconProvider)
+    window.close()
+
+
+def test_file_tab_close_uses_custom_icon_button(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
+    path = tmp_path / "index.html"
+    path.write_text("", encoding="utf-8")
+    window = MainWindow()
+    window.open_file(str(path))
+
+    close_button = window._file_tab_bar.tabButton(0, window._file_tab_bar.ButtonPosition.RightSide)
+
+    assert not window._file_tab_bar.tabsClosable()
+    assert close_button is not None
+    assert not close_button.icon().isNull()
+    window.close()
+
+
+def test_javascript_enter_indents_after_opening_brace(qapp):
+    editor = CodeEditor()
+    editor.set_file_path("main.js")
+    editor.setPlainText("button.addEventListener('click', function() {")
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.End)
+    editor.setTextCursor(cursor)
+
+    editor.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_Return, Qt.NoModifier, "\n"))
+
+    assert editor.toPlainText().endswith("{\n    ")
+
+
+def test_javascript_enter_splits_auto_paired_dom_callback_braces(qapp):
+    editor = CodeEditor()
+    editor.set_file_path("main.js")
+    editor.setPlainText("button.addEventListener('click', function() {})")
+    cursor = editor.textCursor()
+    cursor.setPosition(editor.toPlainText().index("}") )
+    editor.setTextCursor(cursor)
+
+    editor.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_Return, Qt.NoModifier, "\n"))
+
+    assert editor.toPlainText() == "button.addEventListener('click', function() {\n    \n})"
+    assert editor.textCursor().block().text() == "    "
+
+
+def test_javascript_closing_brace_dedents(qapp):
+    editor = CodeEditor()
+    editor.set_file_path("main.js")
+    editor.setPlainText("if (ready) {\n    ")
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.End)
+    editor.setTextCursor(cursor)
+
+    editor.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_BraceRight, Qt.NoModifier, "}"))
+
+    assert editor.toPlainText() == "if (ready) {\n}"
+
+
+def test_tabs_show_absolute_path_for_files_outside_active_folder(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
+    project = tmp_path / "project"
+    external = tmp_path / "shared" / "Main.java"
+    project.mkdir()
+    external.parent.mkdir()
+    external.write_text("class Main {}", encoding="utf-8")
+    window = MainWindow()
+    window.open_file(str(external))
+    assert window._file_tab_bar.tabText(0) == "Main.java"
+    window._current_folder = str(project)
+    window._refresh_file_tab_labels()
+
+    assert window._file_tab_bar.tabText(0) == str(external.resolve())
     window.close()
 
 

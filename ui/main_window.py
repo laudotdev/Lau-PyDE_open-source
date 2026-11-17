@@ -7,7 +7,7 @@ import sys
 import time
 from typing import Optional
 
-from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl, QFileInfo, QMimeDatabase
+from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl, QSize
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
 from PySide6.QtWidgets import QTextEdit
@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QTabWidget,
     QTabBar,
-    QFileIconProvider,
+    QToolButton,
     QVBoxLayout,
     QWidget,
     QStackedWidget,
@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QShortcut, QDesktopServices, QIcon
 from ui.panel_icons import panel_icon, ICON_SIZE
+from ui.file_icons import LauPydeFileIconProvider
 
 from core.file_manager import read_file, write_file
 from core.file_manager import (
@@ -173,7 +174,7 @@ class MainWindow(QMainWindow):
         # directory when running a file).
         self._current_file_path: Optional[str] = None
         self._current_folder: Optional[str] = None
-        self._file_icon_provider = QFileIconProvider()
+        self._file_icon_provider = LauPydeFileIconProvider()
         self._maximized_pane: Optional[str] = None
         self._explorer_minimized = False
         self._bottom_minimized = False
@@ -264,9 +265,8 @@ class MainWindow(QMainWindow):
         self._file_tab_bar.setDocumentMode(True)
         self._file_tab_bar.setExpanding(False)
         self._file_tab_bar.setMovable(True)
-        self._file_tab_bar.setTabsClosable(True)
+        self._file_tab_bar.setTabsClosable(False)
         self._file_tab_bar.currentChanged.connect(self._on_file_tab_changed)
-        self._file_tab_bar.tabCloseRequested.connect(self._close_file_tab)
         self._file_tab_bar.hide()
         editor_container_layout.addWidget(self._file_tab_bar)
         editor_container_layout.addWidget(editor_header)
@@ -932,6 +932,7 @@ class MainWindow(QMainWindow):
             if not folder:
                 return False
             self._current_folder = folder
+            self._refresh_file_tab_labels()
             self.explorer.set_root_folder(folder)
             self.terminal_panel.set_working_directory(folder)
             return True
@@ -1032,6 +1033,7 @@ class MainWindow(QMainWindow):
             return
 
         self._current_folder = str(folder)
+        self._refresh_file_tab_labels()
         self.explorer.set_root_folder(str(folder))
         self.terminal_panel.set_working_directory(str(folder))
         RECENT_PROJECT_FILE.write_text(json.dumps({"project": str(folder)}))
@@ -1080,7 +1082,7 @@ class MainWindow(QMainWindow):
             self,
             "Open File",
             start_dir,
-            "Supported Files (*.py *.txt *.html *.htm *.css *.js *.mjs *.cjs *.md *.json *.yaml *.yml *.cfg *.toml *.c *.h *.cc *.cpp *.cxx *.hpp *.hh *.java);;All Files (*)",
+            "Supported Files (*.py *.txt *.html *.htm *.css *.js *.mjs *.cjs *.md *.json *.yaml *.yml *.cfg *.toml *.c *.h *.cc *.cpp *.cxx *.hpp *.hh *.java *.go *.rs);;All Files (*)",
         )
         if path:
             self.open_file(path)
@@ -1113,9 +1115,24 @@ class MainWindow(QMainWindow):
         if existing_index >= 0:
             self._file_tab_bar.setCurrentIndex(existing_index)
         else:
-            tab_index = self._file_tab_bar.addTab(self._file_icon(path), Path(path).name)
+            tab_index = self._file_tab_bar.addTab(
+                self._file_icon_provider.icon_from_path(path),
+                self._file_tab_label(path),
+            )
             self._file_tab_bar.setTabData(tab_index, path)
             self._file_tab_bar.setTabToolTip(tab_index, path)
+            close_button = QToolButton(self._file_tab_bar)
+            close_button.setIcon(
+                QIcon(str(Path(__file__).resolve().parent.parent / "assets" / "icons" / "file-close.svg"))
+            )
+            close_button.setIconSize(QSize(12, 12))
+            close_button.setFixedSize(18, 18)
+            close_button.setAutoRaise(True)
+            close_button.setToolTip("Close file")
+            close_button.clicked.connect(
+                lambda _checked=False, file_path=path: self._close_file_tab_path(file_path)
+            )
+            self._file_tab_bar.setTabButton(tab_index, QTabBar.RightSide, close_button)
             self._file_tab_bar.setCurrentIndex(tab_index)
             self._on_file_tab_changed(tab_index)
         self._file_tab_bar.show()
@@ -1192,28 +1209,20 @@ class MainWindow(QMainWindow):
         self._update_title()
         self.statusBar().showMessage(f"Opened {path}")
 
-    def _file_icon(self, path: str) -> QIcon:
-        suffix = Path(path).suffix.lower()
-        icon_names = {
-            ".html": "file-html.svg", ".htm": "file-html.svg",
-            ".css": "file-css.svg", ".js": "file-js.svg",
-            ".mjs": "file-js.svg", ".cjs": "file-js.svg",
-            ".md": "file-md.svg", ".json": "file-json.svg",
-            ".yaml": "file-yaml.svg", ".yml": "file-yaml.svg",
-            ".toml": "file-toml.svg", ".c": "file-code.svg",
-            ".h": "file-code.svg", ".cc": "file-code.svg",
-            ".cpp": "file-code.svg", ".cxx": "file-code.svg",
-            ".hpp": "file-code.svg", ".hh": "file-code.svg",
-            ".java": "file-code.svg",
-        }
-        if suffix in icon_names:
-            icon_path = Path(__file__).resolve().parent.parent / "assets" / "icons" / icon_names[suffix]
-            return QIcon(str(icon_path))
-        icon = self._file_icon_provider.icon(QFileInfo(path))
-        if icon.isNull():
-            mime_type = QMimeDatabase().mimeTypeForFile(path)
-            icon = QIcon.fromTheme(mime_type.iconName())
-        return icon
+    def _file_tab_label(self, path: str) -> str:
+        file_path = Path(path).resolve()
+        if self._current_folder:
+            try:
+                file_path.relative_to(Path(self._current_folder).resolve())
+            except ValueError:
+                return str(file_path)
+        return file_path.name
+
+    def _refresh_file_tab_labels(self) -> None:
+        for index in range(self._file_tab_bar.count()):
+            path = self._file_tab_bar.tabData(index)
+            if path:
+                self._file_tab_bar.setTabText(index, self._file_tab_label(path))
 
     def _close_file_tab(self, index: int) -> None:
         closing_path = self._file_tab_bar.tabData(index)
@@ -1228,6 +1237,12 @@ class MainWindow(QMainWindow):
             self._file_tab_bar.hide()
             self._refresh_markdown_preview()
             self._update_title()
+
+    def _close_file_tab_path(self, path: str) -> None:
+        for index in range(self._file_tab_bar.count()):
+            if self._file_tab_bar.tabData(index) == path:
+                self._close_file_tab(index)
+                return
 
     def _refresh_markdown_preview(self, *_args) -> None:
         if not hasattr(self, "_editor_tabs"):
@@ -1253,6 +1268,7 @@ class MainWindow(QMainWindow):
             self.terminal_panel.set_working_directory(folder)
             # self.statusBar().showMessage(f"Workspace: {folder}")
             self._current_folder = folder
+            self._refresh_file_tab_labels()
             self.explorer.set_root_folder(folder)
             # ensure the explorer is visible when a folder is opened
             try:
@@ -1326,6 +1342,7 @@ class MainWindow(QMainWindow):
             if folder and Path(folder).is_dir():
                 folder = str(Path(folder).expanduser().resolve())
                 self._current_folder = folder
+                self._refresh_file_tab_labels()
                 self.terminal_panel.set_working_directory(folder)
                 # set_root_folder deliberately uses the parent as the tree
                 # root so the project folder itself remains visible with its
@@ -1371,7 +1388,7 @@ class MainWindow(QMainWindow):
             self,
             "Save As",
             start_dir,
-            "Supported Files (*.py *.txt *.html *.htm *.css *.js *.mjs *.cjs *.md *.json *.yaml *.yml *.cfg *.toml *.c *.h *.cc *.cpp *.cxx *.hpp *.hh *.java);;All Files (*)",
+            "Supported Files (*.py *.txt *.html *.htm *.css *.js *.mjs *.cjs *.md *.json *.yaml *.yml *.cfg *.toml *.c *.h *.cc *.cpp *.cxx *.hpp *.hh *.java *.go *.rs);;All Files (*)",
         )
         if not path:
             return False
