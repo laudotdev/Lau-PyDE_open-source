@@ -480,7 +480,7 @@ class FileExplorer(QWidget):
 
     def _toggle_commands_section(self) -> None:
         try:
-            if self._commands_section.isVisible():
+            if not self._commands_section.isHidden():
                 # remove the commands section from the layout so its
                 # vertical space is released and the tree expands into it.
                 try:

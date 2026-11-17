@@ -236,6 +236,44 @@ def test_editor_is_direct_view_and_markdown_preview_uses_toggle(qapp, tmp_path, 
     window.close()
 
 
+def test_key_shortcuts_visibility_is_restored_from_settings(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
+    settings = main_window_module.QSettings(
+        main_window_module.SETTINGS_ORGANIZATION, main_window_module.APP_NAME
+    )
+    previous_value = settings.value("show_key_shortcuts", None)
+    try:
+        settings.setValue("show_key_shortcuts", False)
+        settings.sync()
+        first_window = MainWindow()
+        assert first_window.explorer._commands_section.isHidden()
+        assert not first_window._show_commands_list_action.isChecked()
+        first_window.close()
+
+        second_window = MainWindow()
+        assert second_window.explorer._commands_section.isHidden()
+        assert not second_window._show_commands_list_action.isChecked()
+
+        second_window._show_commands_list_action.trigger()
+        assert not second_window.explorer._commands_section.isHidden()
+        assert second_window._show_commands_list_action.isChecked()
+        assert settings.value("show_key_shortcuts", False, type=bool)
+
+        second_window.explorer._commands_toggle.click()
+        assert second_window.explorer._commands_section.isHidden()
+        assert not second_window._show_commands_list_action.isChecked()
+        assert not settings.value("show_key_shortcuts", True, type=bool)
+        second_window.close()
+    finally:
+        if previous_value is None:
+            settings.remove("show_key_shortcuts")
+        else:
+            settings.setValue("show_key_shortcuts", previous_value)
+        settings.sync()
+
+
 def test_javascript_enter_indents_after_opening_brace(qapp):
     editor = CodeEditor()
     editor.set_file_path("main.js")

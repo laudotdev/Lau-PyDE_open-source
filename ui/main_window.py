@@ -209,6 +209,16 @@ class MainWindow(QMainWindow):
         self._update_title()
         QTimer.singleShot(1500, self._startup_update_check)
 
+    def _set_key_shortcuts_visible(self, visible: bool) -> None:
+        visible = bool(visible)
+        if self.explorer._commands_section.isHidden() == visible:
+            self.explorer._toggle_commands_section()
+        settings = QSettings(SETTINGS_ORGANIZATION, APP_NAME)
+        settings.setValue("show_key_shortcuts", visible)
+        settings.sync()
+        if hasattr(self, "_show_commands_list_action"):
+            self._show_commands_list_action.setChecked(visible)
+
     # main setup
     def _build_widgets(self) -> None:
         self.editor = CodeEditor()
@@ -775,20 +785,17 @@ class MainWindow(QMainWindow):
         # action to show/hide commands list in explorer
         show_commands_list_action = QAction("Show Key Shortcuts", self)
         show_commands_list_action.setCheckable(True)
-        show_commands_list_action.setChecked(self.explorer._commands_section.isVisible())
-
-        # when the menu action is toggled, use the explorer's toggle method
-        def _menu_toggle_commands(checked: bool) -> None:
-            try:
-                self.explorer._toggle_commands_section()
-            except Exception:
-                pass
-
-        show_commands_list_action.triggered.connect(_menu_toggle_commands)
+        self._show_commands_list_action = show_commands_list_action
+        settings = QSettings(SETTINGS_ORGANIZATION, APP_NAME)
+        show_commands = settings.value("show_key_shortcuts", True, type=bool)
+        if self.explorer._commands_section.isHidden() == show_commands:
+            self.explorer._toggle_commands_section()
+        show_commands_list_action.setChecked(show_commands)
+        show_commands_list_action.triggered.connect(self._set_key_shortcuts_visible)
 
         # keep action in sync when explorer toggles it using the header button
         try:
-            self.explorer.commands_visibility_changed.connect(lambda visible: show_commands_list_action.setChecked(visible))
+            self.explorer.commands_visibility_changed.connect(self._set_key_shortcuts_visible)
         except Exception:
             pass
 
