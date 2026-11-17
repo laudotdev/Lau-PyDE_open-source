@@ -31,6 +31,68 @@ def test_javascript_uses_language_completions_and_structural_diagnostics(qapp):
     assert editor.get_error_messages() == ["Line 1: '}' is missing."]
 
 
+@pytest.mark.parametrize(
+    ("filename", "prefix", "expected", "key"),
+    [
+        ("site.css", "justi", "justify-content", Qt.Key_Tab),
+        ("site.css", "align-i", "align-items", Qt.Key_Return),
+        ("main.js", "addEvent", "addEventListener", Qt.Key_Tab),
+        ("main.js", "document.getElementByI", "document.getElementById", Qt.Key_Return),
+    ],
+)
+def test_css_and_javascript_completions_accept_with_tab_or_enter(
+    qapp, filename, prefix, expected, key
+):
+    editor = CodeEditor()
+    editor.set_file_path(filename)
+    editor.setPlainText(prefix)
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.End)
+    editor.setTextCursor(cursor)
+    editor.resize(500, 300)
+    editor.show()
+    editor._update_language_completions()
+    editor._show_completion()
+    qapp.processEvents()
+
+    assert editor._completer.popup().isVisible()
+    editor.keyPressEvent(QKeyEvent(QEvent.KeyPress, key, Qt.NoModifier, "\t" if key == Qt.Key_Tab else "\n"))
+
+    assert editor.toPlainText() == expected
+    editor.close()
+
+
+@pytest.mark.parametrize(
+    ("typed", "expected", "accept_key"),
+    [
+        ("addEvent", "addEventListener", Qt.Key_Tab),
+        ("addEvent", "addEventListener", Qt.Key_Return),
+        ("document.getElementByI", "document.getElementById", Qt.Key_Tab),
+        ("document.getElementByI", "document.getElementById", Qt.Key_Return),
+    ],
+)
+def test_javascript_completion_works_during_real_typing(qapp, typed, expected, accept_key):
+    editor = CodeEditor()
+    editor.set_file_path("main.js")
+    editor.resize(500, 300)
+    editor.show()
+    editor.setFocus()
+
+    QTest.keyClicks(editor, typed)
+    qapp.processEvents()
+
+    assert editor.toPlainText() == typed
+    assert editor._completer.popup().isVisible()
+    expected_completion = expected.split(".")[-1]
+    assert editor._completer.currentCompletion() == expected_completion
+
+    QTest.keyClick(editor, accept_key)
+    qapp.processEvents()
+
+    assert editor.toPlainText() == expected
+    editor.close()
+
+
 def test_html_reports_unclosed_tags(qapp):
     editor = CodeEditor()
     editor.set_file_path("index.html")

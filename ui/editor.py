@@ -61,6 +61,99 @@ SOURCE_KEYWORDS = {
     "rust": ["as", "async", "await", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while"],
 }
 
+CSS_PROPERTIES = """
+accent-color align-content align-items align-self all animation animation-composition
+animation-delay animation-direction animation-duration animation-fill-mode animation-iteration-count
+animation-name animation-play-state animation-timing-function appearance aspect-ratio backdrop-filter
+backface-visibility background background-attachment background-blend-mode background-clip
+background-color background-image background-origin background-position background-position-x
+background-position-y background-repeat background-size block-size border border-block border-block-color
+border-block-end border-block-end-color border-block-end-style border-block-end-width border-block-start
+border-block-start-color border-block-start-style border-block-start-width border-block-style
+border-block-width border-bottom border-bottom-color border-bottom-left-radius border-bottom-right-radius
+border-bottom-style border-bottom-width border-collapse border-color border-image border-image-outset
+border-image-repeat border-image-slice border-image-source border-image-width border-inline border-inline-color
+border-inline-end border-inline-end-color border-inline-end-style border-inline-end-width border-inline-start
+border-inline-start-color border-inline-start-style border-inline-start-width border-inline-style
+border-inline-width border-left border-left-color border-left-style border-left-width border-radius border-right
+border-right-color border-right-style border-right-width border-spacing border-style border-top border-top-color
+border-top-left-radius border-top-right-radius border-top-style border-top-width border-width bottom box-shadow
+box-sizing break-after break-before break-inside caption-side caret-color clear clip clip-path color color-scheme
+column-count column-fill column-gap column-rule column-rule-color column-rule-style column-rule-width column-span
+column-width columns contain contain-intrinsic-size container container-name container-type content
+content-visibility cursor direction display empty-cells filter flex flex-basis flex-direction flex-flow flex-grow
+flex-shrink flex-wrap float font font-family font-feature-settings font-kerning font-optical-sizing font-size
+font-size-adjust font-stretch font-style font-variant font-variant-caps font-weight gap grid grid-area grid-auto-columns
+grid-auto-flow grid-auto-rows grid-column grid-column-end grid-column-gap grid-column-start grid-gap grid-row
+grid-row-end grid-row-gap grid-row-start grid-template grid-template-areas grid-template-columns grid-template-rows
+height hyphens image-rendering inline-size inset inset-block inset-block-end inset-block-start inset-inline
+inset-inline-end inset-inline-start isolation justify-content justify-items justify-self left letter-spacing line-break
+line-height list-style list-style-image list-style-position list-style-type margin margin-block margin-block-end
+margin-block-start margin-bottom margin-inline margin-inline-end margin-inline-start margin-left margin-right
+margin-top mask max-block-size max-height max-inline-size max-width min-block-size min-height min-inline-size min-width
+ object-fit object-position opacity order orphans outline outline-color outline-offset outline-style outline-width
+overflow overflow-anchor overflow-wrap overflow-x overflow-y overscroll-behavior overscroll-behavior-block
+overscroll-behavior-inline overscroll-behavior-x overscroll-behavior-y padding padding-block padding-block-end
+padding-block-start padding-bottom padding-inline padding-inline-end padding-inline-start padding-left padding-right
+padding-top page-break-after page-break-before page-break-inside perspective perspective-origin place-content
+place-items place-self pointer-events position print-color-adjust quotes resize right rotate row-gap scale scroll-behavior
+scroll-margin scroll-padding scroll-snap-align scroll-snap-stop scroll-snap-type scrollbar-color scrollbar-gutter
+scrollbar-width shape-outside tab-size table-layout text-align text-align-last text-decoration text-decoration-color
+text-decoration-line text-decoration-style text-indent text-overflow text-rendering text-shadow text-transform top
+touch-action transform transform-origin transform-style transition transition-delay transition-duration transition-property
+transition-timing-function translate unicode-bidi user-select vertical-align visibility white-space widows width
+will-change word-break word-spacing word-wrap writing-mode z-index
+""".split()
+
+JAVASCRIPT_GLOBALS = """
+AggregateError Array ArrayBuffer Atomics BigInt BigInt64Array BigUint64Array Boolean DataView Date Error EvalError
+FinalizationRegistry Float32Array Float64Array Function Infinity Int8Array Int16Array Int32Array Intl JSON Map Math
+NaN Number Object Promise Proxy RangeError ReferenceError Reflect RegExp Set SharedArrayBuffer String Symbol SyntaxError
+TypeError URIError URL URLSearchParams WeakMap WeakRef WeakSet WebAssembly XMLHttpRequest alert atob btoa clearInterval
+clearTimeout console decodeURI decodeURIComponent document encodeURI encodeURIComponent escape eval fetch globalThis history
+isFinite isNaN location localStorage name navigator parseFloat parseInt prompt sessionStorage setInterval setTimeout
+undefined unescape window
+""".split()
+
+JAVASCRIPT_MEMBERS = {
+    "document": """addEventListener adoptNode append createAttribute createComment createDocumentFragment createElement
+        createElementNS createEvent createTextNode doctype documentElement documentURI getElementById getElementsByClassName
+        getElementsByName getElementsByTagName getElementsByTagNameNS importNode querySelector querySelectorAll readyState
+        removeEventListener title body head activeElement cookie forms images links scripts styleSheets visibilityState""",
+    "window": """addEventListener alert atob blur btoa cancelAnimationFrame clearInterval clearTimeout close confirm
+        devicePixelRatio document focus getComputedStyle getSelection history innerHeight innerWidth localStorage location
+        matchMedia moveBy moveTo name navigator open outerHeight outerWidth pageXOffset pageYOffset parent print prompt
+        requestAnimationFrame resizeBy resizeTo screen screenX screenY scroll scrollBy scrollTo self sessionStorage setInterval
+        setTimeout stop top""",
+    "element": """addEventListener append appendChild animate attachShadow before blur click closest compareDocumentPosition
+        contains getAttribute getAttributeNames getBoundingClientRect getElementsByClassName getElementsByTagName hasAttribute
+        insertAdjacentElement insertAdjacentHTML insertAdjacentText matches prepend querySelector querySelectorAll remove
+        removeAttribute removeChild removeEventListener replaceChildren replaceWith scrollIntoView setAttribute toggleAttribute
+        after children classList className clientHeight clientWidth dataset firstChild firstElementChild id innerHTML innerText
+        isConnected lastChild nextElementSibling nextSibling outerHTML parentElement parentNode previousElementSibling
+        previousSibling style tagName textContent""",
+    "console": "assert clear count debug dir error group groupCollapsed groupEnd info log table time timeEnd trace warn",
+    "navigator": "clipboard cookieEnabled geolocation language languages maxTouchPoints onLine platform userAgent",
+    "location": "assign hash host hostname href origin pathname port protocol reload replace search toString",
+    "history": "back forward go length pushState replaceState scrollRestoration state",
+    "localStorage": "clear getItem key length removeItem setItem",
+    "sessionStorage": "clear getItem key length removeItem setItem",
+    "JSON": "parse stringify",
+    "Math": """abs acos acosh asin asinh atan atan2 atanh cbrt ceil clz32 cos cosh exp expm1 floor fround hypot imul log
+        log10 log1p log2 max min pow random round sign sin sinh sqrt tan tanh trunc E LN10 LN2 LOG10E LOG2E PI SQRT1_2 SQRT2""",
+    "Array": "from fromAsync isArray of",
+    "Object": """assign create defineProperties defineProperty entries freeze fromEntries getOwnPropertyDescriptor
+        getOwnPropertyDescriptors getOwnPropertyNames getOwnPropertySymbols getPrototypeOf hasOwn is isExtensible isFrozen
+        isSealed keys preventExtensions seal setPrototypeOf values""",
+    "String": "fromCharCode fromCodePoint raw",
+    "Number": """isFinite isInteger isNaN isSafeInteger parseFloat parseInt MAX_SAFE_INTEGER MAX_VALUE MIN_SAFE_INTEGER
+        MIN_VALUE NaN NEGATIVE_INFINITY POSITIVE_INFINITY""",
+    "Promise": "all allSettled any race reject resolve withResolvers",
+}
+JAVASCRIPT_MEMBERS = {
+    name: " ".join(value.split()) for name, value in JAVASCRIPT_MEMBERS.items()
+}
+
 EXTENSION_LANGUAGES = {
     ".htm": "html", ".html": "html", ".css": "css",
     ".js": "javascript", ".mjs": "javascript", ".cjs": "javascript",
@@ -317,6 +410,7 @@ class CodeEditor(QPlainTextEdit):
 
         # lightweight completion: keywords, builtins, and user-defined names
         self._completion_model = QStringListModel()
+        self._completion_replace_start: int | None = None
         self._positioning_completion_popup = False
         self._completer = QCompleter(self._completion_model, self)
         self._completer.setWidget(self)
@@ -498,8 +592,19 @@ class CodeEditor(QPlainTextEdit):
 
         if not self._is_python_file:
             words = set(re.findall(r"\b[A-Za-z_$][\w$]*\b", code))
-            words.update(SOURCE_KEYWORDS.get(self._language, []))
-            self._completion_model.setStringList(sorted(words)[:200])
+            if self._language == "css":
+                words.update(CSS_PROPERTIES)
+            elif self._language == "javascript":
+                words.update(JAVASCRIPT_GLOBALS)
+                words.update(
+                    member
+                    for members in JAVASCRIPT_MEMBERS.values()
+                    for member in members.split()
+                )
+                words.update({"addEventListener", "removeEventListener"})
+            else:
+                words.update(SOURCE_KEYWORDS.get(self._language, []))
+            self._completion_model.setStringList(sorted(words))
             self._source_diagnostics = self._diagnose_source(code)
             self._highlight_current_line()
             self._line_number_area.update()
@@ -1103,12 +1208,68 @@ class CodeEditor(QPlainTextEdit):
             value = self._completer.currentCompletion()
         if not value:
             return False
+        return self._insert_completion(str(value))
+
+    def _insert_completion(self, value: str) -> bool:
         cursor = self.textCursor()
-        cursor.select(QTextCursor.WordUnderCursor)
-        cursor.insertText(str(value))
+        if self._completion_replace_start is not None:
+            cursor.setPosition(self._completion_replace_start)
+            cursor.setPosition(self.textCursor().position(), QTextCursor.KeepAnchor)
+        else:
+            cursor.select(QTextCursor.WordUnderCursor)
+        cursor.insertText(value)
         self.setTextCursor(cursor)
-        popup.hide()
+        self._completion_replace_start = None
+        self._completer.popup().hide()
         return True
+
+    def _accept_language_prefix(self) -> bool:
+        if self._language not in {"css", "javascript"}:
+            return False
+        self._update_language_completions()
+        prefix = self._completer.completionPrefix()
+        if len(prefix) < 2:
+            return False
+        matches = self._completer.completionModel()
+        if matches.rowCount() == 0:
+            return False
+        candidate = matches.index(0, 0).data()
+        if not candidate or str(candidate).lower() == prefix.lower():
+            return False
+        return self._insert_completion(str(candidate))
+
+    def _update_language_completions(self) -> None:
+        if self._language not in {"css", "javascript"}:
+            return
+        cursor = self.textCursor()
+        line_prefix = cursor.block().text()[:cursor.positionInBlock()]
+        if self._language == "javascript":
+            member_match = re.search(r"\b([A-Za-z_$][\w$]*)\.([\w$]*)$", line_prefix)
+            if member_match:
+                object_name = member_match.group(1)
+                members = JAVASCRIPT_MEMBERS.get(object_name)
+                if members:
+                    self._completion_replace_start = cursor.position() - len(member_match.group(2))
+                    self._completion_model.setStringList(sorted(set(members.split())))
+                    self._completer.setCompletionPrefix(member_match.group(2))
+                    return
+        if self._language == "css":
+            prefix_match = re.search(r"[\w-]*$", line_prefix)
+            prefix = prefix_match.group(0) if prefix_match else ""
+            self._completion_replace_start = cursor.position() - len(prefix)
+            candidates = CSS_PROPERTIES
+        else:
+            prefix = self._word_under_cursor()
+            self._completion_replace_start = cursor.position() - len(prefix)
+            candidates = JAVASCRIPT_GLOBALS
+        if self._language == "javascript":
+            candidates = set(candidates) | {
+                member
+                for members in JAVASCRIPT_MEMBERS.values()
+                for member in members.split()
+            } | {"addEventListener", "removeEventListener"}
+        self._completion_model.setStringList(sorted(set(candidates)))
+        self._completer.setCompletionPrefix(prefix)
 
     def zoom_in(self) -> None:
         font = self.font()
@@ -1129,6 +1290,11 @@ class CodeEditor(QPlainTextEdit):
     def keyPressEvent(self, event) -> None:
         if self.multi_cursor_active and self._handle_multi_cursor_input(event):
             return
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter) and self._completer.popup().isVisible():
+            if self._accept_completion():
+                return
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter) and self._accept_language_prefix():
+            return
         if self._language == "html":
             if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Tab) and self.toPlainText().strip() == "!":
                 if self._expand_html_boilerplate():
@@ -1142,6 +1308,8 @@ class CodeEditor(QPlainTextEdit):
             if self._language == "html" and self._expand_html_abbreviation():
                 return
             if self._accept_completion():
+                return
+            if self._accept_language_prefix():
                 return
         if self._language in {"javascript", "css", "c", "cpp", "java", "go", "rust"} and event.text() == "}":
             cursor = self.textCursor()
@@ -1327,6 +1495,7 @@ class CodeEditor(QPlainTextEdit):
         # after inserting a character, if it's part of an identifier, show completions
         last = event.text()
         if last and (last.isalpha() or last == "_" or last.isdigit()):
+            self._update_language_completions()
             prefix = self._word_under_cursor()
             if prefix:
                 try:
