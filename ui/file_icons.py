@@ -39,7 +39,8 @@ class LauPydeFileIconProvider(QFileIconProvider):
 
     def icon(self, file_info):
         if isinstance(file_info, QFileInfo) and file_info.isFile():
-            icon_name = ICON_FILES.get(file_info.suffix().lower())
+            suffix = file_info.suffix().lower()
+            icon_name = ICON_FILES.get(f".{suffix}") if suffix else None
             if icon_name:
                 icon = QIcon(str(_ICON_DIR / icon_name))
                 if not icon.isNull():

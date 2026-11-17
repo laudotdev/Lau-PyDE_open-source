@@ -3,8 +3,8 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QKeyEvent, QTextCursor
+from PySide6.QtCore import QEvent, Qt, QMimeData, QUrl, QPointF
+from PySide6.QtGui import QKeyEvent, QTextCursor, QDragEnterEvent, QDropEvent
 from PySide6.QtCore import QSize
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
@@ -106,6 +106,8 @@ def test_css_and_javascript_use_distinct_keyword_colors(qapp):
 
 def test_file_icons_use_custom_language_artwork(qapp, tmp_path, monkeypatch):
     from PySide6.QtCore import QFileInfo
+    from pathlib import Path
+    from PySide6.QtGui import QIcon
     import ui.main_window as main_window_module
     from ui.file_icons import LauPydeFileIconProvider
 
@@ -113,6 +115,11 @@ def test_file_icons_use_custom_language_artwork(qapp, tmp_path, monkeypatch):
     window = MainWindow()
     explorer_provider = window.explorer._model.iconProvider()
     tab_provider = window._file_icon_provider
+    expected_icons = {
+        "index.html": "file-html.svg",
+        "site.css": "file-css.svg",
+        "app.js": "file-js.svg",
+    }
     for name in ("index.html", "site.css", "app.js", "README.md", "Main.java"):
         path = tmp_path / name
         path.write_text("", encoding="utf-8")
@@ -120,6 +127,10 @@ def test_file_icons_use_custom_language_artwork(qapp, tmp_path, monkeypatch):
         tab_icon = tab_provider.icon(QFileInfo(str(path)))
         assert not explorer_icon.isNull()
         assert explorer_icon.pixmap(QSize(24, 24)).toImage() == tab_icon.pixmap(QSize(24, 24)).toImage()
+        if name in expected_icons:
+            asset = Path(__file__).resolve().parents[1] / "assets" / "icons" / expected_icons[name]
+            expected_icon = QIcon(str(asset))
+            assert explorer_icon.pixmap(QSize(24, 24)).toImage() == expected_icon.pixmap(QSize(24, 24)).toImage()
     assert isinstance(explorer_provider, LauPydeFileIconProvider)
     window.close()
 
@@ -197,6 +208,34 @@ def test_tabs_show_absolute_path_for_files_outside_active_folder(qapp, tmp_path,
     window._refresh_file_tab_labels()
 
     assert window._file_tab_bar.tabText(0) == str(external.resolve())
+    window.close()
+
+
+def test_dropping_folder_on_editor_opens_workspace(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
+    folder = tmp_path / "dropped-project"
+    folder.mkdir()
+    window = MainWindow()
+    mime_data = QMimeData()
+    mime_data.setUrls([QUrl.fromLocalFile(str(folder))])
+    enter_event = QDragEnterEvent(
+        QPointF(10, 10), Qt.CopyAction, mime_data, Qt.LeftButton, Qt.NoModifier
+    )
+    drop_event = QDropEvent(
+        QPointF(10, 10), Qt.CopyAction, mime_data, Qt.LeftButton, Qt.NoModifier
+    )
+
+    qapp.sendEvent(window.editor, enter_event)
+    qapp.sendEvent(window.editor, drop_event)
+
+    assert enter_event.isAccepted()
+    assert drop_event.isAccepted()
+    assert window._current_folder == str(folder.resolve())
+    assert window.explorer._project_root == str(folder.resolve())
+    assert window.terminal_panel._working_dir == str(folder.resolve())
+    assert main_window_module.RECENT_PROJECT_FILE.exists()
     window.close()
 
 

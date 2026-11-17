@@ -7,7 +7,7 @@ import sys
 import time
 from typing import Optional
 
-from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl, QSize
+from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl, QSize, QEvent
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
 from PySide6.QtWidgets import QTextEdit
@@ -189,6 +189,7 @@ class MainWindow(QMainWindow):
         self._build_widgets()
         self._build_layout()
         self._build_menu_and_shortcuts()
+        self._enable_folder_drop_targets()
 
         # autosave timer
         self._autosave_timer = QTimer(self)
@@ -1262,26 +1263,78 @@ class MainWindow(QMainWindow):
         folder = QFileDialog.getExistingDirectory(self, "Open Folder", start_dir)
 
         if folder:
-            # self._current_folder = folder
-            # # self.explorer.set_root_folder(folder)
-            folder = str(Path(folder).expanduser().resolve())
-            self.terminal_panel.set_working_directory(folder)
-            # self.statusBar().showMessage(f"Workspace: {folder}")
-            self._current_folder = folder
-            self._refresh_file_tab_labels()
-            self.explorer.set_root_folder(folder)
-            # ensure the explorer is visible when a folder is opened
-            try:
-                self.explorer.show()
-            except Exception:
-                pass
-            self.terminal_panel.set_working_directory(folder)
+            self.open_folder_path(folder)
 
-            RECENT_PROJECT_FILE.write_text(
-                json.dumps({"project": folder})
-            )
-            self.statusBar().showMessage(f"Workspace: {folder}")
+    def open_folder_path(self, folder: str) -> bool:
+        folder_path = Path(folder).expanduser().resolve()
+        if not folder_path.is_dir():
+            return False
+        folder = str(folder_path)
+        if folder == self._current_folder:
+            return True
+        if self.editor.document().isModified() and not self.save_file():
+            return False
+
+        self._current_folder = folder
+        self._refresh_file_tab_labels()
+        self.explorer.set_root_folder(folder)
+        self.explorer.show()
+        self.terminal_panel.set_working_directory(folder)
+        RECENT_PROJECT_FILE.write_text(json.dumps({"project": folder}))
         self._show_editor()
+        self.statusBar().showMessage(f"Workspace: {folder}")
+        return True
+
+    def _enable_folder_drop_targets(self) -> None:
+        self.setAcceptDrops(True)
+        for widget in self.findChildren(QWidget):
+            widget.setAcceptDrops(True)
+            widget.installEventFilter(self)
+
+    def _dropped_folder(self, event) -> str | None:
+        mime_data = event.mimeData()
+        if not mime_data.hasUrls():
+            return None
+        for url in mime_data.urls():
+            if not url.isLocalFile():
+                continue
+            path = Path(url.toLocalFile()).expanduser()
+            if path.is_dir():
+                return str(path.resolve())
+        return None
+
+    def eventFilter(self, watched, event) -> bool:
+        if event.type() in (QEvent.DragEnter, QEvent.DragMove, QEvent.Drop):
+            folder = self._dropped_folder(event)
+            if folder:
+                if event.type() == QEvent.Drop:
+                    if self.open_folder_path(folder):
+                        event.acceptProposedAction()
+                    else:
+                        event.ignore()
+                else:
+                    event.acceptProposedAction()
+                return True
+            if event.type() in (QEvent.DragEnter, QEvent.DragMove):
+                event.ignore()
+                return True
+        return super().eventFilter(watched, event)
+
+    def dragEnterEvent(self, event) -> None:
+        if self._dropped_folder(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event) -> None:
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event) -> None:
+        folder = self._dropped_folder(event)
+        if folder and self.open_folder_path(folder):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def close_project(self) -> None:
         """Close the current project workspace."""
