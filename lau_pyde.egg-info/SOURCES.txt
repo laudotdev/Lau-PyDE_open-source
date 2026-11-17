@@ -13,15 +13,14 @@ assets/icons/play.svg
 assets/icons/stop.svg
 core/file_manager.py
 core/runner.py
+core/update_checker.py
 lau_pyde.egg-info/PKG-INFO
 lau_pyde.egg-info/SOURCES.txt
 lau_pyde.egg-info/dependency_links.txt
 lau_pyde.egg-info/entry_points.txt
 lau_pyde.egg-info/requires.txt
 lau_pyde.egg-info/top_level.txt
-tests/test_editor_error_numbers.py
-tests/test_explorer_file_hierarchy.py
-tests/test_gui_search_completion.py
+tests/test_update_checker.py
 ui/__init__.py
 ui/commits.py
 ui/editor.py

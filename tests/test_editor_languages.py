@@ -152,6 +152,28 @@ def test_file_tab_close_uses_custom_icon_button(qapp, tmp_path, monkeypatch):
     window.close()
 
 
+def test_editor_is_direct_view_and_markdown_preview_uses_toggle(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
+    window = MainWindow()
+
+    assert window._editor_content.currentWidget() is window.editor
+    assert window._markdown_preview_button.isHidden()
+    assert not hasattr(window, "_editor_tabs")
+
+    markdown_path = tmp_path / "README.md"
+    markdown_path.write_text("# preview", encoding="utf-8")
+    window.open_file(str(markdown_path))
+    assert not window._markdown_preview_button.isHidden()
+
+    window._toggle_markdown_preview()
+    assert window._editor_content.currentWidget() is window._markdown_preview
+    window._toggle_markdown_preview()
+    assert window._editor_content.currentWidget() is window.editor
+    window.close()
+
+
 def test_javascript_enter_indents_after_opening_brace(qapp):
     editor = CodeEditor()
     editor.set_file_path("main.js")

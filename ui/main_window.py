@@ -234,6 +234,11 @@ class MainWindow(QMainWindow):
         header_layout.setContentsMargins(10, 6, 10, 6)
         header_layout.addWidget(self._file_label)
         header_layout.addStretch()
+        self._markdown_preview_button = QPushButton("Preview")
+        self._markdown_preview_button.setToolTip("Toggle Markdown preview")
+        self._markdown_preview_button.clicked.connect(self._toggle_markdown_preview)
+        self._markdown_preview_button.hide()
+        header_layout.addWidget(self._markdown_preview_button)
         header_layout.addWidget(self._error_badge)
 
         # lightweight in-editor search bar (hidden by default)
@@ -275,13 +280,11 @@ class MainWindow(QMainWindow):
         self._markdown_preview = QTextBrowser()
         self._markdown_preview.setOpenLinks(False)
         self._markdown_preview.setOpenExternalLinks(False)
-        self._editor_tabs = QTabWidget()
-        self._editor_tabs.addTab(self.editor, "Editor")
-        self._editor_tabs.addTab(self._markdown_preview, "Markdown Preview")
-        self._editor_tabs.setTabVisible(1, False)
-        self._editor_tabs.currentChanged.connect(self._refresh_markdown_preview)
+        self._editor_content = QStackedWidget()
+        self._editor_content.addWidget(self.editor)
+        self._editor_content.addWidget(self._markdown_preview)
         self.editor.textChanged.connect(self._refresh_markdown_preview)
-        editor_container_layout.addWidget(self._editor_tabs)
+        editor_container_layout.addWidget(self._editor_content)
 
         # starting code for the welcome message
         # Welcome screen
@@ -1245,16 +1248,25 @@ class MainWindow(QMainWindow):
                 self._close_file_tab(index)
                 return
 
+    def _toggle_markdown_preview(self) -> None:
+        if self._editor_content.currentWidget() is self.editor:
+            self._editor_content.setCurrentWidget(self._markdown_preview)
+            self._markdown_preview_button.setText("Editor")
+        else:
+            self._editor_content.setCurrentWidget(self.editor)
+            self._markdown_preview_button.setText("Preview")
+
     def _refresh_markdown_preview(self, *_args) -> None:
-        if not hasattr(self, "_editor_tabs"):
+        if not hasattr(self, "_editor_content"):
             return
         is_markdown = bool(
             self._current_file_path
             and Path(self._current_file_path).suffix.lower() == ".md"
         )
-        self._editor_tabs.setTabVisible(1, is_markdown)
-        if not is_markdown and self._editor_tabs.currentWidget() is self._markdown_preview:
-            self._editor_tabs.setCurrentWidget(self.editor)
+        self._markdown_preview_button.setVisible(is_markdown)
+        if not is_markdown:
+            self._editor_content.setCurrentWidget(self.editor)
+            self._markdown_preview_button.setText("Preview")
         if is_markdown:
             self._markdown_preview.setMarkdown(self.editor.toPlainText())
 
