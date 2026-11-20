@@ -1422,7 +1422,6 @@ class MainWindow(QMainWindow):
                     # ensure commands section is visible and layout is restored
                     try:
                         self.explorer._commands_section.show()
-                        self.explorer._commands_section.setMaximumHeight(16777215)
                     except Exception:
                         pass
                 except Exception:

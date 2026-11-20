@@ -389,6 +389,20 @@ def test_explorer_root_is_selected_nested_workspace(qapp, tmp_path):
     assert "main.py" in visible_names
 
 
+def test_key_shortcuts_section_stays_content_sized(qapp):
+    explorer = FileExplorer()
+    explorer.resize(220, 900)
+    explorer.populate_commands(MainWindow())
+    explorer.show()
+    qapp.processEvents()
+
+    section = explorer._commands_section
+    assert section.sizePolicy().verticalPolicy().name == "Fixed"
+    assert section.height() <= section.sizeHint().height() + 2
+    assert explorer._tree.height() > section.height()
+    explorer.close()
+
+
 def test_debounced_autosave_writes_active_file(qapp, tmp_path, monkeypatch):
     import ui.main_window as main_window_module
 

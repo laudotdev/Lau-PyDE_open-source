@@ -175,13 +175,13 @@ class FileExplorer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(title_bar)
-        layout.addWidget(self._tree)
+        layout.addWidget(self._tree, 1)
 
         # commands list section: shows compact list of available commands
         self._commands_section = QWidget()
         cmds_layout = QVBoxLayout(self._commands_section)
-        cmds_layout.setContentsMargins(6, 6, 6, 6)
-        cmds_layout.setSpacing(4)
+        cmds_layout.setContentsMargins(4, 3, 4, 3)
+        cmds_layout.setSpacing(2)
 
         # header with label and minimize button
         self._commands_header = QWidget()
@@ -203,14 +203,14 @@ class FileExplorer(QWidget):
         cmds_layout.addWidget(self._commands_header)
 
         self._commands_list = QWidget()
+        self._commands_list.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self._commands_list_layout = QVBoxLayout(self._commands_list)
         self._commands_list_layout.setContentsMargins(0, 0, 0, 0)
-        self._commands_list_layout.setSpacing(2)
+        self._commands_list_layout.setSpacing(0)
         cmds_layout.addWidget(self._commands_list)
-        self._commands_section.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self._commands_section.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
 
         layout.addWidget(self._commands_section)
-        layout.addStretch()
         # track whether the commands section is currently in the layout
         self._commands_section_in_layout = True
 
@@ -637,13 +637,19 @@ class FileExplorer(QWidget):
                 continue
             label_text = f"{text}    {shortcut}" if shortcut else text
             lbl = QLabel(label_text)
-            lbl.setStyleSheet("font-size: 11px; color: #bdbdbd;")
+            lbl.setStyleSheet("font-size: 10px; color: #bdbdbd;")
+            lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             self._commands_list_layout.addWidget(lbl)
 
         if not deduped:
             lbl = QLabel("No commands available")
-            lbl.setStyleSheet("font-size: 11px; color: #777777;")
+            lbl.setStyleSheet("font-size: 10px; color: #777777;")
+            lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             self._commands_list_layout.addWidget(lbl)
+
+        self._commands_list.adjustSize()
+        self._commands_section.adjustSize()
+        self.layout().invalidate()
 
     def _create_file(self, folder_path: str) -> None:
         name, ok = QInputDialog.getText(self, 'New File', 'File name:')
