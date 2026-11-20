@@ -5,9 +5,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PySide6.QtCore import QEvent, Qt, QMimeData, QUrl, QPointF
-from PySide6.QtGui import QKeyEvent, QTextCursor, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QKeyEvent, QTextCursor, QDragEnterEvent, QDropEvent, QImage, QTextDocument
 from PySide6.QtCore import QSize
 from PySide6.QtTest import QTest
+from PySide6.QtNetwork import QTcpServer, QHostAddress
 from PySide6.QtWidgets import QApplication
 
 from ui.editor import CodeEditor
@@ -236,6 +237,69 @@ def test_editor_is_direct_view_and_markdown_preview_uses_toggle(qapp, tmp_path, 
     window._toggle_markdown_preview()
     assert window._editor_content.currentWidget() is window.editor
     window.close()
+
+
+def test_markdown_preview_resolves_relative_images_and_styles_document(qapp, tmp_path):
+    from PySide6.QtCore import QUrl
+    from ui.main_window import MarkdownPreviewBrowser
+
+    image_path = tmp_path / "badge.png"
+    image = QImage(12, 12, QImage.Format.Format_ARGB32)
+    image.fill(Qt.red)
+    assert image.save(str(image_path))
+
+    markdown_path = tmp_path / "README.md"
+    preview = MarkdownPreviewBrowser()
+    preview.set_markdown_source("# Project\n\n<img src=\"badge.png\" width=\"12\">", str(markdown_path))
+    resource = preview.loadResource(QTextDocument.ImageResource, QUrl("badge.png"))
+    resolved_image = QImage.fromData(bytes(resource))
+
+    assert not resolved_image.isNull()
+    assert "border-bottom" in preview.document().defaultStyleSheet()
+    assert "background-color" in preview.document().defaultStyleSheet()
+    preview.close()
+
+
+def test_markdown_preview_loads_remote_svg_asynchronously(qapp):
+    from PySide6.QtCore import QUrl
+    from ui.main_window import MarkdownPreviewBrowser
+
+    server = QTcpServer()
+    assert server.listen(QHostAddress.SpecialAddress.LocalHost, 0)
+    svg_data = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>'
+    response = (
+        b"HTTP/1.1 200 OK\r\n"
+        b"Content-Type: image/svg+xml\r\n"
+        + f"Content-Length: {len(svg_data)}\r\n".encode("ascii")
+        + b"Connection: close\r\n\r\n"
+        + svg_data
+    )
+
+    def respond_to_request():
+        socket = server.nextPendingConnection()
+        socket.readyRead.connect(
+            lambda socket=socket: (
+                socket.readAll(),
+                socket.write(response),
+                socket.disconnectFromHost(),
+            )
+        )
+
+    server.newConnection.connect(respond_to_request)
+    preview = MarkdownPreviewBrowser()
+    loaded_urls = []
+    preview.image_loaded.connect(loaded_urls.append)
+    image_url = QUrl(f"http://127.0.0.1:{server.serverPort()}/icon.svg")
+
+    assert preview.loadResource(QTextDocument.ImageResource, image_url).isNull()
+    QTest.qWait(300)
+
+    assert image_url.toString() in loaded_urls
+    cached = preview.loadResource(QTextDocument.ImageResource, image_url)
+    assert isinstance(cached, QImage)
+    assert not cached.isNull()
+    preview.close()
+    server.close()
 
 
 def test_key_shortcuts_visibility_is_restored_from_settings(qapp, tmp_path, monkeypatch):

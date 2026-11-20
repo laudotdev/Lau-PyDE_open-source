@@ -7,10 +7,11 @@ import sys
 import time
 from typing import Optional
 
-from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl, QSize, QEvent
+from PySide6.QtCore import Qt, QSettings, QThread, QTimer, QUrl, QSize, QEvent, Signal
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat
+from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QTextCursor, QTextCharFormat, QColor, QTextCharFormat as _QTextCharFormat, QImage, QTextDocument
 from PySide6.QtWidgets import QTextEdit
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -57,6 +58,123 @@ APP_VERSION = "1.1.0"
 SETTINGS_ORGANIZATION = "Lau-PyDE"
 
 RECENT_PROJECT_FILE = Path.home() / ".lau_pyde_recent.json"
+
+MARKDOWN_PREVIEW_STYLESHEET = """
+body {
+    color: #d7dce2;
+    font-family: "Noto Sans", "DejaVu Sans", sans-serif;
+    font-size: 14px;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: #f0f3f6;
+    margin-top: 24px;
+    margin-bottom: 12px;
+}
+h1 {
+    font-size: 30px;
+    border-bottom: 1px solid #414a54;
+    padding-bottom: 8px;
+}
+h2 {
+    font-size: 23px;
+    border-bottom: 1px solid #343c45;
+    padding-bottom: 6px;
+}
+h3 { font-size: 18px; }
+p { margin-top: 8px; margin-bottom: 14px; }
+a { color: #69b8ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+blockquote {
+    color: #b6c0cb;
+    background-color: #252b31;
+    border-left: 3px solid #4da99b;
+    margin-left: 0;
+    padding: 8px 14px;
+}
+code {
+    color: #e8c782;
+    background-color: #292e34;
+    font-family: "DejaVu Sans Mono", monospace;
+    padding: 2px 4px;
+}
+pre {
+    color: #d7dce2;
+    background-color: #171a1e;
+    border: 1px solid #343c45;
+    padding: 12px;
+}
+pre code { background-color: transparent; padding: 0; }
+table {
+    border-collapse: collapse;
+    margin-top: 12px;
+    margin-bottom: 18px;
+}
+th {
+    color: #f0f3f6;
+    background-color: #303840;
+    font-weight: bold;
+}
+th, td {
+    border: 1px solid #48525d;
+    padding: 7px 10px;
+}
+tr:nth-child(even) { background-color: #24292f; }
+hr { color: #414a54; background-color: #414a54; height: 1px; }
+img { vertical-align: middle; margin: 4px 6px 4px 0; }
+li { margin-top: 3px; margin-bottom: 3px; }
+"""
+
+
+class MarkdownPreviewBrowser(QTextBrowser):
+    image_loaded = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._network = QNetworkAccessManager(self)
+        self._pending_image_urls: set[str] = set()
+        self._image_cache: dict[str, QImage] = {}
+        self.document().setDefaultStyleSheet(MARKDOWN_PREVIEW_STYLESHEET)
+        self.document().setDocumentMargin(24)
+        self.setOpenLinks(True)
+        self.setOpenExternalLinks(True)
+
+    def set_markdown_source(self, markdown: str, source_path: str | None) -> None:
+        if source_path:
+            source_directory = Path(source_path).expanduser().resolve().parent
+            self.setSearchPaths([str(source_directory)])
+            self.document().setBaseUrl(QUrl.fromLocalFile(str(source_directory) + "/"))
+        else:
+            self.setSearchPaths([])
+            self.document().setBaseUrl(QUrl())
+        self.document().setDefaultStyleSheet(MARKDOWN_PREVIEW_STYLESHEET)
+        self.setMarkdown(markdown)
+
+    def loadResource(self, resource_type, name):
+        url = name if isinstance(name, QUrl) else QUrl(str(name))
+        if resource_type == QTextDocument.ImageResource and url.scheme().lower() in {"http", "https"}:
+            key = url.toString()
+            if key in self._image_cache:
+                return self._image_cache[key]
+            if key not in self._pending_image_urls:
+                self._pending_image_urls.add(key)
+                reply = self._network.get(QNetworkRequest(url))
+                reply.finished.connect(lambda reply=reply, key=key, url=url: self._finish_image_request(reply, key, url))
+            return QImage()
+        return super().loadResource(resource_type, name)
+
+    def _finish_image_request(self, reply, key: str, url: QUrl) -> None:
+        self._pending_image_urls.discard(key)
+        if reply.error() == reply.NetworkError.NoError:
+            image_data = bytes(reply.readAll())
+            if len(image_data) <= 8 * 1024 * 1024:
+                image = QImage.fromData(image_data)
+                if not image.isNull():
+                    self._image_cache[key] = image
+                    self.document().addResource(QTextDocument.ImageResource, url, image)
+                    self.document().markContentsDirty(0, self.document().characterCount())
+                    self.viewport().update()
+                    self.image_loaded.emit(key)
+        reply.deleteLater()
 
 DARK_STYLESHEET = """
 
@@ -287,9 +405,7 @@ class MainWindow(QMainWindow):
         editor_container_layout.addWidget(self._file_tab_bar)
         editor_container_layout.addWidget(editor_header)
         editor_container_layout.addWidget(self._search_bar)
-        self._markdown_preview = QTextBrowser()
-        self._markdown_preview.setOpenLinks(False)
-        self._markdown_preview.setOpenExternalLinks(False)
+        self._markdown_preview = MarkdownPreviewBrowser()
         self._editor_content = QStackedWidget()
         self._editor_content.addWidget(self.editor)
         self._editor_content.addWidget(self._markdown_preview)
@@ -1275,7 +1391,9 @@ class MainWindow(QMainWindow):
             self._editor_content.setCurrentWidget(self.editor)
             self._markdown_preview_button.setText("Preview")
         if is_markdown:
-            self._markdown_preview.setMarkdown(self.editor.toPlainText())
+            self._markdown_preview.set_markdown_source(
+                self.editor.toPlainText(), self._current_file_path
+            )
 
     def open_folder_dialog(self) -> None:
         start_dir = self._current_folder or str(Path.home())
