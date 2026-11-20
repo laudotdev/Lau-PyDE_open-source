@@ -983,13 +983,13 @@ class MainWindow(QMainWindow):
             saved_line_number_mode = "absolute"
         self._set_line_number_mode(saved_line_number_mode, persist=False)
 
-        # Git actions (Feature 9): interactive push which may prompt for credentials
+        """ # Git actions (Feature 9): interactive push which may prompt for credentials
         git_menu = menu_bar.addMenu("&Git")
 
         git_push_action = QAction("Push (git)", self)
         git_push_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
         git_push_action.triggered.connect(self._git_push)
-        git_menu.addAction(git_push_action)
+        git_menu.addAction(git_push_action) """
 
         # help menu / updater
         help_menu = menu_bar.addMenu("&Help")
