@@ -239,6 +239,154 @@ def test_editor_is_direct_view_and_markdown_preview_uses_toggle(qapp, tmp_path, 
     window.close()
 
 
+def test_welcome_screen_quick_actions_use_existing_actions(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+    from PySide6.QtWidgets import QFileDialog, QInputDialog
+
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
+    settings = main_window_module.QSettings(
+        main_window_module.SETTINGS_ORGANIZATION, main_window_module.APP_NAME
+    )
+    previous_recent = settings.value("recent_files", None, type=list)
+    settings.setValue("recent_files", [])
+    settings.sync()
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("", False))
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: ("", ""))
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: "")
+    window = MainWindow()
+    triggered = {"new": 0, "open": 0, "folder": 0}
+    window._new_file_action.triggered.connect(lambda _checked=False: triggered.__setitem__("new", triggered["new"] + 1))
+    window._open_file_action.triggered.connect(lambda _checked=False: triggered.__setitem__("open", triggered["open"] + 1))
+    window._open_folder_action.triggered.connect(lambda _checked=False: triggered.__setitem__("folder", triggered["folder"] + 1))
+
+    assert window._welcome_footer.text().endswith(f"v{main_window_module.APP_VERSION}")
+    assert window._welcome_recent_section.isHidden()
+    for action_key in ("new", "open", "folder"):
+        window._welcome_action_buttons[action_key].click()
+
+    assert triggered == {"new": 1, "open": 1, "folder": 1}
+    window.close()
+    if previous_recent is None:
+        settings.remove("recent_files")
+    else:
+        settings.setValue("recent_files", previous_recent)
+    settings.sync()
+
+
+def test_startup_after_closing_project_shows_welcome_screen(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+
+    recent_project_file = tmp_path / "recent.json"
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", recent_project_file)
+
+    first_window = MainWindow()
+    first_window.open_folder_path(str(project))
+    first_window.close_project()
+    first_window.close()
+
+    assert not recent_project_file.exists()
+
+    reopened_window = MainWindow()
+    assert reopened_window._editor_stack.currentWidget() is reopened_window._welcome_widget
+    assert reopened_window.explorer.isHidden()
+    assert reopened_window._bottom_tabs.isHidden()
+    reopened_window.open_folder_path(str(project))
+    assert not reopened_window.explorer.isHidden()
+    assert not reopened_window._bottom_tabs.isHidden()
+    reopened_window.close_project()
+    assert reopened_window.explorer.isHidden()
+    assert reopened_window._bottom_tabs.isHidden()
+    reopened_window.close()
+
+
+def test_welcome_recent_files_are_real_deduplicated_and_reopen_existing_tab(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+    from PySide6.QtWidgets import QLabel, QToolButton
+
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
+    settings = main_window_module.QSettings(
+        main_window_module.SETTINGS_ORGANIZATION, main_window_module.APP_NAME
+    )
+    previous_recent = settings.value("recent_files", None, type=list)
+    files = [tmp_path / f"project_{index}" / f"file_{index}.py" for index in range(6)]
+    try:
+        settings.setValue("recent_files", [])
+        for path in files:
+            path.parent.mkdir()
+            path.write_text(f"value = {path.stem}\n", encoding="utf-8")
+
+        window = MainWindow()
+        for path in files:
+            window._record_recent_file(str(path))
+        window._record_recent_file(str(files[3]))
+
+        recent = window._recent_file_paths()
+        assert recent == [str(files[3]), str(files[5]), str(files[4]), str(files[2]), str(files[1])]
+        assert not window._welcome_recent_section.isHidden()
+        assert window._welcome_recent_rows.count() == 5
+        first_row = window._welcome_recent_rows.itemAt(0).widget()
+        recent_button = first_row.findChild(QToolButton, "recentFileButton")
+        parent_label = first_row.findChildren(QLabel)[0]
+        assert recent_button.text() == files[3].name
+        try:
+            relative_parent = files[3].parent.relative_to(Path.home())
+            expected_parent = "~/" + relative_parent.as_posix()
+        except ValueError:
+            expected_parent = str(files[3].parent)
+        assert parent_label.text() == expected_parent
+
+        window.open_file(str(files[3]))
+        window.open_file(str(files[5]))
+        assert window._file_tab_bar.count() == 2
+        recent_button = None
+        for row_index in range(window._welcome_recent_rows.count()):
+            row_widget = window._welcome_recent_rows.itemAt(row_index).widget()
+            candidate = row_widget.findChild(QToolButton, "recentFileButton")
+            if candidate.toolTip() == str(files[3]):
+                recent_button = candidate
+                break
+        assert recent_button is not None
+        recent_button.click()
+        assert window._current_file_path == str(files[3].resolve())
+        assert window._file_tab_bar.count() == 2
+        window.close()
+    finally:
+        if previous_recent is None:
+            settings.remove("recent_files")
+        else:
+            settings.setValue("recent_files", previous_recent)
+        settings.sync()
+
+
+def test_missing_recent_file_is_removed_and_reported(qapp, tmp_path, monkeypatch):
+    import ui.main_window as main_window_module
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(main_window_module, "RECENT_PROJECT_FILE", tmp_path / "recent.json")
+    settings = main_window_module.QSettings(
+        main_window_module.SETTINGS_ORGANIZATION, main_window_module.APP_NAME
+    )
+    previous_recent = settings.value("recent_files", None, type=list)
+    messages = []
+    monkeypatch.setattr(QMessageBox, "information", lambda *args: messages.append(args[-1]))
+    missing = tmp_path / "removed.py"
+    try:
+        settings.setValue("recent_files", [str(missing)])
+        window = MainWindow()
+        window._open_recent_file(str(missing))
+        assert messages and "no longer exists" in messages[0]
+        assert str(missing) not in settings.value("recent_files", [], type=list)
+        window.close()
+    finally:
+        if previous_recent is None:
+            settings.remove("recent_files")
+        else:
+            settings.setValue("recent_files", previous_recent)
+        settings.sync()
+
+
 def test_markdown_preview_resolves_relative_images_and_styles_document(qapp, tmp_path):
     from PySide6.QtCore import QUrl
     from ui.main_window import MarkdownPreviewBrowser

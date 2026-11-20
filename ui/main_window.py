@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QHBoxLayout,
+    QGridLayout,
     QInputDialog,
     QDialogButtonBox,
     QTextBrowser,
@@ -29,6 +30,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QTabBar,
     QToolButton,
+    QFrame,
     QVBoxLayout,
     QWidget,
     QStackedWidget,
@@ -54,7 +56,7 @@ from ui.terminal import TerminalPanel
 from core.update_checker import RELEASE_PAGE, UpdateWorker, compare_versions, current_platform, select_download_url
 
 APP_NAME = "Lau-PyDE"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 SETTINGS_ORGANIZATION = "Lau-PyDE"
 
 RECENT_PROJECT_FILE = Path.home() / ".lau_pyde_recent.json"
@@ -337,6 +339,121 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_show_commands_list_action"):
             self._show_commands_list_action.setChecked(visible)
 
+    def _welcome_section_heading(self, title: str) -> QWidget:
+        heading = QWidget()
+        row = QHBoxLayout(heading)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(12)
+        label = QLabel(title)
+        label.setStyleSheet(
+            "font-size: 11px; font-weight: bold; color: #aebdce; letter-spacing: 1px;"
+        )
+        rule = QFrame()
+        rule.setFrameShape(QFrame.HLine)
+        rule.setFixedHeight(1)
+        rule.setStyleSheet("color: #343c45; background: #343c45; border: none;")
+        row.addWidget(label)
+        row.addWidget(rule, 1)
+        return heading
+
+    def _recent_file_paths(self) -> list[str]:
+        settings = QSettings(SETTINGS_ORGANIZATION, APP_NAME)
+        stored_paths = settings.value("recent_files", [], type=list)
+        recent = []
+        seen = set()
+        for stored_path in stored_paths:
+            try:
+                path = Path(str(stored_path)).expanduser().resolve()
+            except (OSError, RuntimeError):
+                continue
+            key = str(path)
+            if key in seen or not path.is_file():
+                continue
+            seen.add(key)
+            recent.append(key)
+            if len(recent) == 5:
+                break
+        if recent != stored_paths:
+            settings.setValue("recent_files", recent)
+        return recent
+
+    def _record_recent_file(self, path: str) -> None:
+        try:
+            resolved_path = str(Path(path).expanduser().resolve())
+        except (OSError, RuntimeError):
+            return
+        if not Path(resolved_path).is_file():
+            return
+        recent = [item for item in self._recent_file_paths() if item != resolved_path]
+        recent.insert(0, resolved_path)
+        settings = QSettings(SETTINGS_ORGANIZATION, APP_NAME)
+        settings.setValue("recent_files", recent[:5])
+        settings.sync()
+        self._refresh_welcome_recent_files()
+
+    def _remove_recent_file(self, path: str) -> None:
+        settings = QSettings(SETTINGS_ORGANIZATION, APP_NAME)
+        settings.setValue(
+            "recent_files",
+            [item for item in self._recent_file_paths() if item != path],
+        )
+        settings.sync()
+        self._refresh_welcome_recent_files()
+
+    def _open_recent_file(self, path: str) -> None:
+        if not Path(path).is_file():
+            self._remove_recent_file(path)
+            QMessageBox.information(
+                self,
+                APP_NAME,
+                f"This recent file no longer exists and was removed from the list:\n{path}",
+            )
+            return
+        self.open_file(path)
+
+    def _refresh_welcome_recent_files(self) -> None:
+        if not hasattr(self, "_welcome_recent_rows"):
+            return
+        while self._welcome_recent_rows.count():
+            item = self._welcome_recent_rows.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        paths = self._recent_file_paths()
+        self._welcome_recent_section.setVisible(bool(paths))
+        for path in paths:
+            file_path = Path(path)
+            row_widget = QWidget()
+            row = QHBoxLayout(row_widget)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(12)
+            open_button = QToolButton()
+            open_button.setObjectName("recentFileButton")
+            open_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+            open_button.setIcon(self._file_icon_provider.icon_from_path(path))
+            open_button.setText(file_path.name)
+            open_button.setToolTip(path)
+            open_button.setCursor(Qt.PointingHandCursor)
+            open_button.setStyleSheet(
+                "QToolButton { color: #d7dce2; border: none; text-align: left; padding: 5px 2px; }"
+                "QToolButton:hover { color: #75baff; background: #252b31; }"
+            )
+            open_button.clicked.connect(
+                lambda _checked=False, recent_path=path: self._open_recent_file(recent_path)
+            )
+            parent = file_path.parent
+            try:
+                relative_parent = parent.relative_to(Path.home())
+                parent_text = "~/" + relative_parent.as_posix() if str(relative_parent) != "." else "~"
+            except ValueError:
+                parent_text = str(parent)
+            parent_label = QLabel(parent_text)
+            parent_label.setStyleSheet("font-size: 12px; color: #738295;")
+            row.addWidget(open_button)
+            row.addWidget(parent_label, 1)
+            self._welcome_recent_rows.addWidget(row_widget)
+
     # main setup
     def _build_widgets(self) -> None:
         self.editor = CodeEditor()
@@ -412,75 +529,90 @@ class MainWindow(QMainWindow):
         self.editor.textChanged.connect(self._refresh_markdown_preview)
         editor_container_layout.addWidget(self._editor_content)
 
-        # starting code for the welcome message
-        # Welcome screen
         self._editor_stack = QStackedWidget()
 
         self._welcome_widget = QWidget()
         welcome_layout = QVBoxLayout(self._welcome_widget)
-        welcome_layout.setAlignment(Qt.AlignCenter)
-        welcome_layout.setSpacing(8)
+        welcome_layout.setContentsMargins(24, 24, 24, 24)
+        welcome_layout.addStretch(1)
 
-        # Title
+        welcome_content = QWidget()
+        welcome_content.setObjectName("welcomeContent")
+        welcome_content.setMaximumWidth(560)
+        content_layout = QVBoxLayout(welcome_content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
         welcome_title = QLabel("Welcome to Lau-PyDE")
         welcome_title.setAlignment(Qt.AlignCenter)
         welcome_title.setStyleSheet(
-            "font-size: 24px;"
+            "font-size: 32px;"
             "font-weight: bold;"
+            "color: #f0f3f6;"
         )
-
-        # Subtitle
-        welcome_subtitle = QLabel(
-            "A simple and lightweight Python Development Environment"
-        )
+        welcome_subtitle = QLabel("A lightweight environment for Python development.")
         welcome_subtitle.setAlignment(Qt.AlignCenter)
-        welcome_subtitle.setStyleSheet(
-            "font-size: 12px;"
+        welcome_subtitle.setStyleSheet("font-size: 16px; color: #aebdce; margin-top: 12px;")
+        content_layout.addWidget(welcome_title)
+        content_layout.addWidget(welcome_subtitle)
+
+        content_layout.addSpacing(42)
+        content_layout.addWidget(self._welcome_section_heading("QUICK ACTIONS"))
+        actions_grid = QGridLayout()
+        actions_grid.setContentsMargins(0, 12, 0, 0)
+        actions_grid.setHorizontalSpacing(24)
+        actions_grid.setVerticalSpacing(8)
+        self._welcome_action_buttons = {}
+        for row, (action_key, shortcut, label) in enumerate((
+            ("new", "Ctrl+N", "New File"),
+            ("open", "Ctrl+O", "Open File"),
+            ("folder", "Ctrl+L", "Open Folder"),
+        )):
+            key_label = QLabel(shortcut)
+            key_label.setAlignment(Qt.AlignCenter)
+            key_label.setStyleSheet(
+                "QLabel { color: #c4cfdb; background: #2a3038; border: 1px solid #3b444f; "
+                "border-radius: 4px; padding: 5px 8px; font-family: monospace; font-size: 12px; }"
+            )
+            action_button = QPushButton(label)
+            action_button.setObjectName(f"welcome_{action_key}_action")
+            action_button.setFlat(True)
+            action_button.setCursor(Qt.PointingHandCursor)
+            action_button.setStyleSheet(
+                "QPushButton { color: #d7dce2; text-align: left; padding: 5px 4px; }"
+                "QPushButton:hover { color: #75baff; background: #252b31; }"
+            )
+            self._welcome_action_buttons[action_key] = action_button
+            actions_grid.addWidget(key_label, row, 0, Qt.AlignLeft)
+            actions_grid.addWidget(action_button, row, 1)
+        actions_grid.setColumnStretch(1, 1)
+        content_layout.addLayout(actions_grid)
+
+        content_layout.addSpacing(36)
+        self._welcome_recent_section = QWidget()
+        recent_layout = QVBoxLayout(self._welcome_recent_section)
+        recent_layout.setContentsMargins(0, 0, 0, 0)
+        recent_layout.setSpacing(0)
+        recent_layout.addWidget(self._welcome_section_heading("RECENT FILES"))
+        self._welcome_recent_rows = QVBoxLayout()
+        self._welcome_recent_rows.setContentsMargins(0, 10, 0, 0)
+        self._welcome_recent_rows.setSpacing(4)
+        recent_layout.addLayout(self._welcome_recent_rows)
+        content_layout.addWidget(self._welcome_recent_section)
+
+        self._welcome_footer = QLabel(
+            f"Lau-PyDE   ·   Python Development Environment   ·   v{APP_VERSION}"
         )
+        self._welcome_footer.setAlignment(Qt.AlignCenter)
+        self._welcome_footer.setStyleSheet("font-size: 11px; color: #738295; margin-top: 34px;")
+        content_layout.addWidget(self._welcome_footer)
 
-        # Get Started title
-        welcome_get_started_title = QLabel("Get Started with these commands")
-        welcome_get_started_title.setAlignment(Qt.AlignCenter)
-        welcome_get_started_title.setStyleSheet(
-            "font-size: 14px;"
-            "font-weight: bold;"
-        )
-
-        # Commands
-        welcome_new_file = QLabel("Ctrl+N    |    New File")
-        welcome_open_file = QLabel("Ctrl+O    |    Open File")
-        welcome_open_folder = QLabel("Ctrl+L    |    Open Folder")
-
-        for label in (
-            welcome_new_file,
-            welcome_open_file,
-            welcome_open_folder,
-        ):
-            label.setAlignment(Qt.AlignCenter)
-            label.setStyleSheet("font-size: 13px;")
-
-        # Ending message
-        welcome_footer = QLabel("Enjoy using Lau-PyDE. Happy coding!")
-        welcome_footer.setAlignment(Qt.AlignCenter)
-        welcome_footer.setStyleSheet("font-size: 13px;")
-
-        # Add everything
-        welcome_layout.addWidget(welcome_title)
-        welcome_layout.addWidget(welcome_subtitle)
-
-        welcome_layout.addSpacing(24)
-
-        welcome_layout.addWidget(welcome_get_started_title)
-        welcome_layout.addWidget(welcome_new_file)
-        welcome_layout.addWidget(welcome_open_file)
-        welcome_layout.addWidget(welcome_open_folder)
-
-        welcome_layout.addSpacing(24)
-
-        welcome_layout.addWidget(welcome_footer)
+        welcome_layout.addWidget(welcome_content, 0, Qt.AlignHCenter)
+        welcome_layout.addStretch(1)
         self._editor_stack.addWidget(self._welcome_widget)
         self._editor_stack.addWidget(self._editor_container)
         self._editor_stack.setCurrentWidget(self._welcome_widget)
+        self._refresh_welcome_recent_files()
 
         # self.explorer = FileExplorer()
         # self.load_recent_project()
@@ -780,6 +912,7 @@ class MainWindow(QMainWindow):
         file_menu = menu_bar.addMenu("&File")
 
         new_action = QAction("New File", self)
+        self._new_file_action = new_action
         new_action.setShortcut(QKeySequence("Ctrl+N"))
         new_action.triggered.connect(self.new_file)
         file_menu.addAction(new_action)
@@ -790,14 +923,26 @@ class MainWindow(QMainWindow):
         file_menu.addAction(new_folder_action)
 
         open_action = QAction("Open File...", self)
+        self._open_file_action = open_action
         open_action.setShortcut(QKeySequence("Ctrl+O"))
         open_action.triggered.connect(self.open_file_dialog)
         file_menu.addAction(open_action)
 
         open_folder_action = QAction("Open Folder...", self)
+        self._open_folder_action = open_folder_action
         open_folder_action.setShortcut(QKeySequence("Ctrl+L"))
         open_folder_action.triggered.connect(self.open_folder_dialog)
         file_menu.addAction(open_folder_action)
+
+        self._welcome_action_buttons["new"].clicked.connect(
+            lambda _checked=False: self._new_file_action.trigger()
+        )
+        self._welcome_action_buttons["open"].clicked.connect(
+            lambda _checked=False: self._open_file_action.trigger()
+        )
+        self._welcome_action_buttons["folder"].clicked.connect(
+            lambda _checked=False: self._open_folder_action.trigger()
+        )
 
         close_project_action = QAction("Close Project", self)
         close_project_action.setShortcut(QKeySequence("Ctrl+P"))
@@ -1219,6 +1364,7 @@ class MainWindow(QMainWindow):
         Open dialog and by double-clicking a file in the explorer."""
         path = str(Path(path).expanduser().resolve())
         if path == self._current_file_path:
+            self._record_recent_file(path)
             self._show_editor()
             return
 
@@ -1284,6 +1430,7 @@ class MainWindow(QMainWindow):
 
         self._update_title()
         self.statusBar().showMessage(f"Opened {path}")
+        self._record_recent_file(path)
 
     def _on_file_tab_changed(self, index: int) -> None:
         if index < 0:
@@ -1335,6 +1482,7 @@ class MainWindow(QMainWindow):
             )
         self._update_title()
         self.statusBar().showMessage(f"Opened {path}")
+        self._record_recent_file(path)
 
     def _file_tab_label(self, path: str) -> str:
         file_path = Path(path).resolve()
@@ -1363,6 +1511,7 @@ class MainWindow(QMainWindow):
             self.editor.clear()
             self._file_tab_bar.hide()
             self._refresh_markdown_preview()
+            self._show_welcome()
             self._update_title()
 
     def _close_file_tab_path(self, path: str) -> None:
@@ -1835,7 +1984,8 @@ class MainWindow(QMainWindow):
         self._bottom_minimized = False
         self._maximized_pane = None
         self._restore_layout()
-        self.explorer.show()
+        if self._current_folder or self._current_file_path:
+            self.explorer.show()
         try:
             self.explorer.restore_commands_section()
         except AttributeError:
@@ -1846,7 +1996,11 @@ class MainWindow(QMainWindow):
 
         self._main_splitter.show()
         self._editor_stack.show()
-        self._editor_stack.setCurrentWidget(self._editor_container)
+        welcome_active = not (self._current_folder or self._current_file_path)
+        if not welcome_active:
+            self._editor_stack.setCurrentWidget(self._editor_container)
+        else:
+            self._editor_stack.setCurrentWidget(self._welcome_widget)
         self._editor_container.show()
         self.editor.show()
         # ensure the active editor-output splitter is in the main splitter
@@ -1862,17 +2016,22 @@ class MainWindow(QMainWindow):
         self._editor_and_output.show()
         self._editor_and_output.setVisible(True)
 
-        self.explorer.setVisible(not self._explorer_minimized)
+        self.explorer.setVisible(not welcome_active and not self._explorer_minimized)
         # Respect the minimized flag; `setVisible` controls whether
         # the explorer is shown. Do not force-show here.
 
         self._bottom_tabs.show()
-        self._bottom_tabs.setVisible(not self._bottom_minimized)
+        self._bottom_tabs.setVisible(not welcome_active and not self._bottom_minimized)
         self._bottom_tabs.tabBar().show()
 
-        self._main_splitter.setSizes([220, max(1, self.width() - 220)])
+        if welcome_active:
+            self._main_splitter.setSizes([0, max(1, self.width())])
+        else:
+            self._main_splitter.setSizes([220, max(1, self.width() - 220)])
 
-        if not self._bottom_minimized:
+        if welcome_active:
+            self._editor_and_output.setSizes([max(1, self.height()), 0])
+        elif not self._bottom_minimized:
             # when not minimized, sizing depends on orientation
             if self._output_orientation == "horizontal":
                 # vertical splitter: editor height larger than bottom panel
@@ -1936,10 +2095,15 @@ class MainWindow(QMainWindow):
 
     # shwow welcome message method
     def _show_welcome(self) -> None:
-       self._editor_stack.setCurrentWidget(self._welcome_widget)   
+         self._refresh_welcome_recent_files()
+         self._editor_stack.setCurrentWidget(self._welcome_widget)
+         if hasattr(self, "_main_splitter"):
+             self._restore_layout()
 
     def _show_editor(self) -> None:
         self._editor_stack.setCurrentWidget(self._editor_container)
+        if hasattr(self, "_main_splitter"):
+            self._restore_layout()
 
     def _maybe_autosave(self) -> None:
         if not self.editor.document().isModified():
