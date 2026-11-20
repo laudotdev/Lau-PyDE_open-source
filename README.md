@@ -2,15 +2,19 @@
 
 **Lau-PyDE** is a lightweight Python Development Environment (PyDE) built with **Python + PySide6 + Qt**.
 
-> Version: **1.1.0**  
-> Platform: **Windows and Linux**  
-> Status: **Open Source**
+> **Version:** 1.2.0  
+> **Platform:** Windows and Linux  
+> **Status:** Open Source
 
 Lau-PyDE is designed around one simple workflow:
 
 > **Launch the IDE → Code → Run**
 
-It is intentionally focused on the basic Python development workflow instead of trying to become a PyCharm or VS Code clone.
+Originally focused on providing a simple Python development environment, Lau-PyDE has evolved into a lightweight multi-language code editor while keeping Python as its primary language and execution environment.
+
+It supports editing multiple file types commonly used in software development without introducing the resource overhead and complexity of a full-scale IDE.
+
+It is intentionally focused on essential development workflows instead of trying to become a PyCharm or VS Code clone.
 
 **Repository:**  
 https://github.com/laudotdev/Lau-PyDE_open-source
@@ -20,6 +24,8 @@ https://github.com/laudotdev/Lau-PyDE_open-source
 # Features
 
 ## Code Editor
+
+### Python Development
 
 - Python syntax highlighting
 - Highlighting for keywords, built-ins, functions, classes, numbers, strings, comments, and f-string variables
@@ -39,6 +45,81 @@ https://github.com/laudotdev/Lau-PyDE_open-source
 - `Shift+Tab` removes four spaces from the current or selected lines
 - In-editor search with `Ctrl+F`
 
+### Multi-Language Editing
+
+Lau-PyDE v1.2.0 expands beyond Python editing, allowing developers to work with multiple file types inside the same workspace.
+
+**Supported file types:**
+
+| Category | File Extensions |
+|---|---|
+| Python | `.py` |
+| Web Development | `.html`, `.css`, `.js` |
+| Markup and Documentation | `.md` |
+| Data and Configuration | `.json`, `.yaml`, `.yml`, `.toml` |
+| C/C++ | `.c`, `.h`, `.cpp`, `.hpp` |
+| Java | `.java` |
+| Go | `.go` |
+| Rust | `.rs` |
+
+**Features:**
+
+- Language-aware syntax highlighting
+- Separate editor tabs for multiple open files
+- Lightweight language-specific diagnostics
+- Automatic file-type recognition
+- External file path support
+- Open and save support for supported file types
+- Explorer integration for navigating and opening different file types
+- Consistent editing experience across supported languages
+
+> **Note:** Multi-language editing does not mean multi-language execution. Lau-PyDE's built-in Run functionality remains Python-only. Other languages can be edited, but their execution requires their respective external development tools.
+
+### HTML, CSS, and JavaScript Assistance
+
+Lau-PyDE also introduces lightweight development assistance for frontend files.
+
+- CSS autocomplete
+- JavaScript autocomplete
+- Browser-related autocomplete suggestions
+- Tab/Enter acceptance for autocomplete suggestions
+- HTML abbreviations and snippets
+- Automatic HTML structure generation
+- Common HTML element abbreviations
+- CSS linking through HTML abbreviations
+- Input-type abbreviations
+- Automatic brace and indentation assistance
+
+**Examples of supported HTML abbreviations:**
+
+| Abbreviation | Purpose |
+|---|---|
+| `h1` | HTML heading |
+| `link:css` | CSS stylesheet link |
+| `input:number` | Number input element |
+| `!` | Basic HTML document structure |
+
+These features provide lightweight assistance without requiring a full language server or heavyweight development extension system.
+
+### Markdown Support
+
+- Markdown syntax highlighting
+- Markdown file editing
+- Markdown preview toggle
+- Switch between editing and previewing Markdown content
+
+### Multi-File Editing
+
+- Open multiple files simultaneously
+- Separate tabs for each opened file
+- Switch between files without closing the current workspace
+- Tab close controls using SVG icons
+- Support for files outside the currently opened project folder
+- File opening through the Explorer
+- File opening through external paths
+- Save changes to their respective original file locations
+- Maintain independent editing sessions for opened files
+
 ## Project Management
 
 - Open project folders
@@ -52,6 +133,9 @@ https://github.com/laudotdev/Lau-PyDE_open-source
 - Opened project paths are persisted as absolute paths for Linux and Windows
 - Missing or moved saved projects are handled without crashing
 - Explorer hierarchy preserves the project root with nested files and folders
+- Support for multiple file types within one project
+- Synchronization between Explorer, terminal, and active workspace
+- Open workspace by dragging a folder from the Dolphin file manager into Lau-PyDE
 
 ## Python Runner
 
@@ -65,6 +149,7 @@ https://github.com/laudotdev/Lau-PyDE_open-source
 - Running programs use the project workspace as their working directory
 - Output run control changes between a Play icon and a Stop icon
 - Stop and run controls remain synchronized with the program state
+- Built-in execution is exclusively intended for Python files
 
 ## Integrated Terminal
 
@@ -81,13 +166,16 @@ https://github.com/laudotdev/Lau-PyDE_open-source
 - Supports shell commands such as `echo`, `touch`, `mkdir`, and platform-appropriate removal commands
 - Terminal prompts follow the active project folder and avoid stale or duplicate paths
 - Terminal output and copied selections remain usable while commands run
+- Synchronizes with the active project workspace
+- Maintains consistent workspace navigation between the Explorer and terminal
 
 ## User Interface
 
 - Dark theme
-- Welcome screen for the empty/no-project state
+- Redesigned in-editor welcome screen for the empty/no-project state
+- Direct editor-based welcome experience without unnecessary dialog-based navigation
 - Explorer panel
-- Editor panel
+- Multi-tab editor panel
 - Output panel
 - Integrated Terminal panel
 - Minimize and maximize controls for panels
@@ -100,8 +188,14 @@ https://github.com/laudotdev/Lau-PyDE_open-source
 - Output, Terminal, and Explorer controls use one shared SVG icon set
 - Panel controls keep consistent sizing, padding, spacing, and alignment on Linux and Windows
 - Output orientation can move between bottom and right layouts
+- Persistent Show Key Shortcuts option
+- Shared custom file icons for supported file types
+- Consistent editor tab appearance and SVG-based tab close controls
+- Improved workspace navigation and synchronization
+- Markdown preview toggle
+- Dolphin drag-and-drop folder integration
 
-## v1.1.0 release validation
+## v1.2.0 Release Validation
 
 Run the automated checks before preparing release assets:
 
@@ -110,11 +204,29 @@ python3 -m pytest -q
 python3 -m compileall -q core ui main.py launcher.py
 ```
 
-On Arch Linux, build the package with `./installer/arch/build-arch-package.sh`. Confirm the resulting file exists under `installer/arch/` before publishing it.
+On Arch Linux, build the package with:
 
-For generic Linux, run `./installer/linux/install.sh`; uninstall with `./installer/linux/uninstall.sh`. These scripts use a user-level installation and do not replace user projects or settings.
+```sh
+./installer/arch/build-arch-package.sh
+```
 
-The Windows installer must be built and tested on Windows using the workflow in `installer/windows/README.md`. This Arch environment has not produced or runtime-tested the Windows installer.
+Confirm the resulting file exists under `installer/arch/` before publishing it.
+
+For generic Linux, run:
+
+```sh
+./installer/linux/install.sh
+```
+
+Uninstall with:
+
+```sh
+./installer/linux/uninstall.sh
+```
+
+These scripts use a user-level installation and do not replace user projects or settings.
+
+The Windows installer must be built and tested on Windows using the workflow in `installer/windows/README.md`.
 
 GitHub Releases remains the source of release metadata. The website source is not part of this repository, so website deployment and platform-specific website links require separate verification.
 
@@ -128,7 +240,9 @@ GitHub Releases remains the source of release metadata. The website source is no
 pyde lau
 ```
 
-- Designed around the V1 motto:
+- Supports standalone Windows installer distribution
+- Supports Linux installation through the provided installation scripts and distribution-specific packaging
+- Designed around the packaging philosophy:
 
 ```text
 Install once → Run everywhere
@@ -136,13 +250,21 @@ Install once → Run everywhere
 
 Once installed, `pyde lau` can be launched from the repository directory or another working directory.
 
+### Update Availability
+
+Source-based package installations can receive updates earlier than separately built standalone installers and Linux distribution packages.
+
+Users who install directly from the GitHub repository can access newer repository changes as soon as those changes are available and installable. Standalone Windows `.exe` installers and Linux installation packages follow their respective build, testing, and release processes, so their updates may become available later.
+
+For users who prioritize earlier access to development updates, the source-based installation is the preferred option. Standalone installers remain the more convenient option for users who prefer a packaged installation experience.
+
 ---
 
 # PyCharm vs. Lau-PyDE
 
 Lau-PyDE was created with a strong focus on being lightweight on a modest laptop. One of the project's early goals was to compare the actual resource usage of the two applications on the same machine.
 
-## Recorded benchmark
+## Recorded Benchmark
 
 The following results were recorded on the same **Arch Linux** system while testing the same large project.
 
@@ -165,34 +287,40 @@ The recorded process RSS values were approximately:
 
 These are **recorded measurements from one test environment**, not a universal benchmark for every computer, project, or PyCharm version. System background processes, caches, project size, and configuration can affect memory usage.
 
-The benchmark reflects the project's main design goal: **keep the IDE simple and lightweight while still providing the basic Python workflow.**
+The benchmark reflects the project's main design goal: **keep the development environment simple and lightweight while providing the essential tools needed for everyday development.**
+
+> The figures above represent the earlier recorded benchmark, not a controlled v1.2.0 performance comparison.
 
 ---
 
 # Installation
 
-Lau-PyDE v1.1.0 is currently distributed as an installable Python package from the source repository. A standalone native Linux installer is **not included yet**.
+Lau-PyDE v1.2.0 is distributed through its source repository and platform-specific installation methods.
 
-The recommended installation method is `.exe` for Windows and **pipx** for Linux, which installs the application into an isolated environment and exposes its command on your `PATH`. This also keeps Lau-PyDE's dependencies separate from the operating system's Python environment.
+The recommended installation method is the standalone `.exe` installer for Windows and **pipx** for Linux source-based installations.
+
+pipx installs the application into an isolated environment and exposes its command on your `PATH`. This also keeps Lau-PyDE's dependencies separate from the operating system's Python environment.
+
+For users who prioritize receiving development updates earlier, installing directly from the GitHub repository is recommended.
 
 ## Requirements
 
 - Python **3.10+**
 - Git, if cloning the repository
-- pipx
+- pipx for source-based Linux installation
 - A desktop environment capable of running PySide6 applications
 
 > The current pipx installation requires Python 3.10 or newer on the machine used to install pipx.
 
 ## Windows
 
-### Windows installer
+### Windows Installer
 
 Windows users can download **Lau-PyDE-Setup.exe** here:
 
 https://laupyde.online
 
-The installer is the recommended Windows installation method.
+The standalone installer is the recommended Windows installation method for users who prefer a straightforward installation process.
 
 ### Install Python
 
@@ -248,7 +376,7 @@ pyde lau
 
 On recent Ubuntu and Debian releases that use an externally managed system Python, install pipx through the distribution package manager instead of installing it into the system Python with pip.
 
-Ubuntu:
+**Ubuntu:**
 
 ```bash
 sudo apt update
@@ -256,7 +384,7 @@ sudo apt install pipx
 pipx ensurepath
 ```
 
-Debian:
+**Debian:**
 
 ```bash
 sudo apt update
@@ -299,7 +427,7 @@ Run:
 pyde lau
 ```
 
-### Other Linux distributions
+### Other Linux Distributions
 
 Use the distribution's package manager to install `pipx` when available. This avoids conflicts with distributions that mark the system Python as externally managed.
 
@@ -318,7 +446,7 @@ Then run:
 pyde lau
 ```
 
-### Install directly from Git
+### Install Directly from Git
 
 For a pipx-supported source-control installation, you can also install directly from the repository:
 
@@ -338,7 +466,7 @@ pipx supports installing applications from local paths and Git repositories.
 
 # Install Once → Run Everywhere
 
-The V1 packaging goal is simple:
+The packaging goal is simple:
 
 ```text
 Install once → Run everywhere
@@ -366,6 +494,8 @@ pyde lau
 
 The application should not require the repository directory to be the current working directory.
 
+Source-based installations can receive repository updates earlier than separately packaged standalone releases.
+
 ---
 
 # First Launch
@@ -373,15 +503,18 @@ The application should not require the repository directory to be the current wo
 1. Start Lau-PyDE with `pyde lau`.
 2. If no recent project exists, Lau-PyDE opens its welcome/empty state.
 3. Open a project folder using **Open Folder**.
-4. The selected folder becomes the workspace.
-5. Open a `.py` file from the explorer.
-6. Write or edit Python code.
-7. Lau-PyDE checks the code while you work.
-8. Run the current file.
-9. View results in the Output panel.
-10. Programs using `input()` receive input through the integrated input area.
-11. The terminal uses the current project folder as its working directory.
-12. Use **Close Project** to unload the workspace and return to the welcome state.
+4. Alternatively, drag a folder from Dolphin into Lau-PyDE to open it as a workspace.
+5. The selected folder becomes the workspace.
+6. Open a supported file from the Explorer.
+7. Write or edit code using the editor.
+8. Switch between opened files using their respective editor tabs.
+9. Lau-PyDE provides language-aware syntax highlighting and supported diagnostics while you work.
+10. Use the Markdown preview when working with Markdown documents.
+11. Run the current Python file when working with Python.
+12. View execution results in the Output panel.
+13. Programs using `input()` receive input through the integrated input area.
+14. The terminal uses the current project folder as its working directory.
+15. Use **Close Project** to unload the workspace and return to the welcome state.
 
 Lau-PyDE remembers the most recently opened project folder and attempts to restore it on the next launch.
 
@@ -392,7 +525,7 @@ name = input("Enter your name: ")
 print(f"Hello, {name}!")
 ```
 
-Expected:
+**Expected output:**
 
 ```text
 Enter your name: Laurence
@@ -428,50 +561,136 @@ Lau-PyDE/
 
 # Design Philosophy
 
-Lau-PyDE focuses on the basic Python workflow:
+Lau-PyDE focuses on providing a lightweight development environment without unnecessary complexity.
+
+Its development workflow can be summarized as:
 
 ```text
 Write → Check → Run → Output → Fix → Run again
 ```
 
-It is intentionally **not** a PyCharm or VS Code clone.
+Although v1.2.0 expands its editing capabilities to multiple programming and markup languages, Python remains the primary focus of the project.
+
+The goal is not to replace heavyweight IDEs or compete with every feature they offer. Instead, Lau-PyDE provides a practical environment for developers who need a fast, straightforward editor with essential development tools.
 
 The project prioritizes:
 
-- simple startup
-- low memory usage
-- a clean interface
-- basic Python development tools
-- learning through building
-- minimal unnecessary features
+- Simple startup
+- Low memory usage
+- A clean interface
+- Lightweight multi-language editing
+- Essential Python development tools
+- Learning through building
+- Minimal unnecessary features
+- Cross-platform consistency
+- User control over the development environment
 
 ---
 
-# V1 Scope
+# Version Scope
 
-Version 1.0 focuses on improving the core IDE rather than adding a large number of new features.
+## V1.0.0 – V1.1.0
 
-Much of the V1 work was focused on fixing flaws, improving diagnostics, cleaning up the user experience, and making the application easier to install and run.
+The initial development stages focused on establishing and improving the core Python development environment.
 
-## Not in V1
+Major development priorities included:
+
+- Python code editing
+- Python execution
+- Integrated terminal
+- Project management
+- Code diagnostics
+- Editor usability
+- Cross-platform reliability
+- Installation and packaging
+- Resource efficiency
+
+Much of the early work involved fixing existing flaws, improving diagnostics, cleaning up the user experience, and making the application easier to install and run.
+
+## V1.2.0 – Multi-Language Editing
+
+Version 1.2.0 expands Lau-PyDE beyond its original Python-only editing experience.
+
+The motivation came from practical development workflows where working on a single application often requires switching between different languages and file types.
+
+For example, developing a Flask application involves working with Python backend files alongside HTML, CSS, and JavaScript frontend files.
+
+Previously, this required switching between different editors to handle the frontend and backend portions of a project.
+
+With v1.2.0, Lau-PyDE introduces multi-file and multi-language editing capabilities, allowing developers to work with these files inside one lightweight environment.
+
+**Major additions include:**
+
+- Multi-language syntax highlighting
+- Multiple editor tabs
+- HTML, CSS, JavaScript, Markdown, JSON, YAML, TOML, C/C++, Java, Go, and Rust editing support
+- Lightweight language diagnostics
+- CSS and JavaScript autocomplete
+- HTML abbreviations and snippets
+- Markdown preview
+- Shared file icons
+- Improved workspace synchronization
+- Dolphin drag-and-drop folder integration
+- Persistent keyboard shortcut visibility
+- Redesigned in-editor welcome experience
+
+The expansion does not change the project's core identity:
+
+> **Lau-PyDE remains a Python Development Environment with additional multi-language editing capabilities.**
+
+## Not in Scope
+
+The following features remain outside the current project scope:
 
 - AI assistant
-- Debugger
+- Built-in debugger
 - Git integration
-- Language servers
-- Advanced autocomplete
+- Language server integration
+- Full advanced autocomplete
 - Plugin system
 - Project indexing
 - Cloud services
 - Telemetry
+- Built-in execution for programming languages other than Python
 
-These are intentionally outside the current V1 scope.
+These exclusions help keep the project focused on performance, simplicity, and maintainability.
 
 ---
 
 # Recent Fixes and Improvements
 
-Recent development updates focused on reliability and consistency across Linux and Windows:
+Recent development updates focused on reliability, consistency, and expanding the editor's capabilities across Linux and Windows.
+
+### Editor and Language Support
+
+- Expanded the editor to support multiple programming languages and file types.
+- Added separate tabs for multiple opened files.
+- Introduced language-aware syntax highlighting.
+- Added lightweight diagnostics for supported languages.
+- Added CSS and JavaScript autocomplete.
+- Added HTML abbreviations and snippets.
+- Added Markdown preview functionality.
+- Improved external-file handling and file path support.
+- Added shared custom file icons for supported file types.
+- Improved tab appearance and introduced SVG-based tab close controls.
+
+### Workspace and Navigation
+
+- Added folder drag-and-drop integration with the Dolphin file manager.
+- Improved synchronization between the Explorer, terminal, and recent workspace.
+- Improved workspace navigation and project restoration.
+- Maintained project root visibility and Explorer hierarchy.
+- Improved handling of missing or moved saved projects.
+
+### User Interface
+
+- Redesigned the welcome experience to provide a more direct editor-based interface.
+- Added persistent Show Key Shortcuts functionality.
+- Improved panel consistency through shared SVG icons.
+- Standardized panel control alignment and sizing.
+- Improved the overall editing experience across Linux and Windows.
+
+### Previous Reliability Improvements
 
 - Fixed recent-project startup ordering so the restored folder is applied after terminal initialization.
 - Fixed terminal prompt duplication, stale home-directory prompts, missing command output, and extra blank lines.
@@ -486,19 +705,22 @@ Recent development updates focused on reliability and consistency across Linux a
 - Replaced mixed Unicode panel glyphs with shared vector icons and standardized panel control alignment.
 - Kept local tests, IDE metadata, virtual environments, caches, and build artifacts out of Git tracking through `.gitignore`.
 
+---
+
 # Known Limitations
 
-- No standalone Windows installer yet (historical note; the current Windows installer is available from https://laupyde.online)
-- No native Linux installer/package for distribution repositories yet
-- No built-in debugger
-- No Git integration
-- No language server
-- No advanced autocomplete
-- Syntax checking is intentionally basic
-- Built-in typo detection is heuristic and can never replace a full language server
-- The integrated terminal is not a full native terminal emulator
-- Some advanced ANSI terminal behavior may not be reproduced exactly
-- Resource usage and startup time can vary depending on the system and project being used
+- Multi-language editing does not provide built-in execution for languages other than Python.
+- No built-in debugger.
+- No Git integration.
+- No full language server integration.
+- No advanced language-server-based autocomplete.
+- Syntax checking and diagnostics are intentionally lightweight.
+- Built-in typo detection is heuristic and can never replace a full language server.
+- CSS and JavaScript autocomplete provide lightweight assistance rather than a complete IDE-level language intelligence system.
+- The integrated terminal is not a full native terminal emulator.
+- Some advanced ANSI terminal behavior may not be reproduced exactly.
+- Resource usage and startup time can vary depending on the system, opened files, and project being used.
+- Standalone installer updates may become available later than source-based package updates.
 
 ---
 
@@ -536,9 +758,8 @@ pyde lau
 
 Lau-PyDE is an open-source project.
 
-Repository:
-
-https://github.com/ryuuufynnn/Lau-PyDE_open-source
+**Repository:**  
+https://github.com/laudotdev/Lau-PyDE_open-source
 
 Issues, fixes, improvements, and future development are tracked through the project repository.
 
@@ -548,4 +769,4 @@ This project is open source. See the repository for license information.
 
 ## Credits
 
-Built by **John Laurence Aramay / ryu.dev**.
+Built by **John Laurence Aramay / laudotdev**.
