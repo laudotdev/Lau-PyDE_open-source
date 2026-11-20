@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication
 
 from ui.main_window import DARK_STYLESHEET, MainWindow
 
-PENGUIN_NAME = "Siren"
+PENGUIN_NAME = "Lesley"
 
 def set_windows_app_id() -> None:
     if sys.platform != "win32":
