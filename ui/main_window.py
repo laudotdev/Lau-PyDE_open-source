@@ -1416,10 +1416,7 @@ class MainWindow(QMainWindow):
                 self._current_folder = folder
                 self._refresh_file_tab_labels()
                 self.terminal_panel.set_working_directory(folder)
-                # set_root_folder deliberately uses the parent as the tree
-                # root so the project folder itself remains visible with its
-                # folder icon and contents nested beneath it. Do not replace
-                # that index with the project folder here.
+                # Keep the Explorer rooted at the selected workspace folder.
                 self.explorer.set_root_folder(folder)
                 try:
                     # ensure commands section is visible and layout is restored

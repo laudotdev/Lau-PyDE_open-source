@@ -111,9 +111,11 @@ class FileExplorer(QWidget):
         self._model.setNameFilterDisables(True)
         # Show directories and files; hide '.' and '..'
         self._model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files)
+        self._model.directoryLoaded.connect(self._on_directory_loaded)
 
         self._error_counts = {}
         self._project_root = None
+        self._workspace_parent = None
 
         self._tree = QTreeView()
         self._tree.setModel(self._model)
@@ -235,6 +237,7 @@ class FileExplorer(QWidget):
             except Exception:
                 pass
             self._tree.hide()
+            self._workspace_parent = None
             # hide commands section when no folder open
             try:
                 self._commands_section.hide()
@@ -246,80 +249,29 @@ class FileExplorer(QWidget):
             except Exception:
                 pass
             return
-        p = Path(folder_path)
+        p = Path(folder_path).expanduser().resolve()
         try:
-            # If possible, set the view root to the folder's parent and
-            # hide all siblings so the chosen folder is the only visible
-            # child. This makes the explorer clearly show "the chosen
-            # folder" rather than a list of siblings under its parent.
-            parent = p.parent
-            if parent.exists() and parent != p:
-                # clear previously hidden rows
-                if self._last_hidden_parent is not None:
-                    try:
-                        self._unhide_all_rows(self._last_hidden_parent)
-                    except Exception:
-                        pass
+            if self._last_hidden_parent is not None:
+                self._unhide_all_rows(self._last_hidden_parent)
+                self._last_hidden_parent = None
 
+            parent = p.parent
+            if parent == p:
+                self._workspace_parent = None
+                self._model.setRootPath(str(p))
+                self._tree.setRootIndex(self._model.index(str(p)))
+            else:
+                self._workspace_parent = str(parent)
                 self._model.setRootPath(str(parent))
                 parent_idx = self._model.index(str(parent))
                 self._tree.setRootIndex(parent_idx)
-
-                # hide all rows except the chosen folder
-                # compare paths using resolution and case-normalization so
-                # Windows path variants (case/different separators) do not
-                # cause the chosen folder to be hidden by accident.
-                def _norm_path(x: str) -> str:
-                    try:
-                        return str(Path(x).resolve())
-                    except Exception:
-                        return os.path.normcase(os.path.normpath(str(x)))
-
-                target_norm = _norm_path(p)
-                for row in range(self._model.rowCount(parent_idx)):
-                    child = self._model.index(row, 0, parent_idx)
-                    child_path = self._model.filePath(child)
-                    child_norm = _norm_path(child_path)
-                    hide = child_norm != target_norm
-                    try:
-                        self._tree.setRowHidden(row, parent_idx, hide)
-                    except Exception:
-                        pass
-
-                # remember which parent we hid rows under so we can unhide later
                 self._last_hidden_parent = parent_idx
-
-                # expand the chosen folder so its contents are visible
-                try:
-                    chosen_idx = self._model.index(str(p))
-                    if chosen_idx.isValid():
-                        self._tree.expand(chosen_idx)
-                        self._tree.setCurrentIndex(chosen_idx)
-                except Exception:
-                    pass
-
-                self._tree.show()
-                try:
-                    self._commands_section.show()
-                    try:
-                        self._commands_toggle.setText("▁")
-                        self._commands_toggle.setToolTip("Minimize commands list")
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-                return
-
-            # fallback: set the model root directly to the folder
-            self._model.setRootPath(str(p))
-            idx = self._model.index(str(p))
-            if idx.isValid():
-                self._tree.setRootIndex(idx)
-                try:
-                    self._tree.expand(idx)
-                except Exception:
-                    pass
-                self._tree.show()
+                self._filter_workspace_siblings()
+                chosen_idx = self._model.index(str(p))
+                if chosen_idx.isValid():
+                    self._tree.expand(chosen_idx)
+                    self._tree.setCurrentIndex(chosen_idx)
+            self._tree.show()
             try:
                 self._commands_section.show()
                 try:
@@ -337,6 +289,28 @@ class FileExplorer(QWidget):
                 self._tree.show()
             except Exception:
                 self._tree.hide()
+
+    def _on_directory_loaded(self, path: str) -> None:
+        if self._workspace_parent and Path(path).resolve() == Path(self._workspace_parent):
+            self._filter_workspace_siblings()
+
+    def _filter_workspace_siblings(self) -> None:
+        if not self._workspace_parent or not self._project_root:
+            return
+        parent_idx = self._model.index(self._workspace_parent)
+        if not parent_idx.isValid():
+            return
+
+        self._last_hidden_parent = parent_idx
+        target = Path(self._project_root).resolve()
+        for row in range(self._model.rowCount(parent_idx)):
+            child = self._model.index(row, 0, parent_idx)
+            child_path = Path(self._model.filePath(child)).resolve()
+            self._tree.setRowHidden(row, parent_idx, child_path != target)
+
+        selected_idx = self._model.index(str(target))
+        if selected_idx.isValid():
+            self._tree.expand(selected_idx)
 
     def _on_double_clicked(self, index) -> None:
         path = self._model.filePath(index)

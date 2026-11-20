@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -10,6 +11,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from ui.editor import CodeEditor
+from ui.explorer import FileExplorer
 from ui.main_window import MainWindow
 
 
@@ -359,6 +361,32 @@ def test_dropping_folder_on_editor_opens_workspace(qapp, tmp_path, monkeypatch):
     assert window.terminal_panel._working_dir == str(folder.resolve())
     assert main_window_module.RECENT_PROJECT_FILE.exists()
     window.close()
+
+
+def test_explorer_root_is_selected_nested_workspace(qapp, tmp_path):
+    project = tmp_path / "30days_python_challenge"
+    selected_folder = project / "day_three"
+    selected_folder.mkdir(parents=True)
+    (selected_folder / "main.py").write_text("print(3)", encoding="utf-8")
+    (project / "day_four").mkdir()
+
+    explorer = FileExplorer()
+    explorer.set_root_folder(str(selected_folder))
+    QTest.qWait(250)
+
+    root_index = explorer._tree.rootIndex()
+    assert Path(explorer._model.filePath(root_index)).resolve() == project.resolve()
+    selected_index = explorer._model.index(str(selected_folder))
+    sibling_index = explorer._model.index(str(project / "day_four"))
+    assert selected_index.isValid()
+    assert not explorer._tree.isRowHidden(selected_index.row(), root_index)
+    assert explorer._tree.isRowHidden(sibling_index.row(), root_index)
+
+    visible_names = [
+        explorer._model.fileName(explorer._model.index(row, 0, selected_index))
+        for row in range(explorer._model.rowCount(selected_index))
+    ]
+    assert "main.py" in visible_names
 
 
 def test_debounced_autosave_writes_active_file(qapp, tmp_path, monkeypatch):
