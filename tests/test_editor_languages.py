@@ -479,6 +479,16 @@ def test_key_shortcuts_visibility_is_restored_from_settings(qapp, tmp_path, monk
         assert second_window.explorer._commands_section.isHidden()
         assert not second_window._show_commands_list_action.isChecked()
         assert not settings.value("show_key_shortcuts", True, type=bool)
+
+        first_project = tmp_path / "first-project"
+        second_project = tmp_path / "second-project"
+        first_project.mkdir()
+        second_project.mkdir()
+        assert second_window.open_folder_path(str(first_project))
+        assert second_window.explorer._commands_section.isHidden()
+        second_window.close_project()
+        assert second_window.open_folder_path(str(second_project))
+        assert second_window.explorer._commands_section.isHidden()
         second_window.close()
     finally:
         if previous_value is None:

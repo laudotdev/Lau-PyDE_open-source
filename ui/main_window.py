@@ -1564,6 +1564,9 @@ class MainWindow(QMainWindow):
         self._current_folder = folder
         self._refresh_file_tab_labels()
         self.explorer.set_root_folder(folder)
+        settings = QSettings(SETTINGS_ORGANIZATION, APP_NAME)
+        show_key_shortcuts = settings.value("show_key_shortcuts", True, type=bool)
+        self._set_key_shortcuts_visible(show_key_shortcuts)
         self.explorer.show()
         self.terminal_panel.set_working_directory(folder)
         RECENT_PROJECT_FILE.write_text(json.dumps({"project": folder}))
