@@ -201,6 +201,40 @@ def test_javascript_highlighter_colors_common_tokens(qapp):
     assert color_at("should stay") == "#77c7a6"
 
 
+def test_html_highlighter_colors_markup_and_comments(qapp):
+    editor = CodeEditor()
+    editor.set_file_path("index.html")
+    source = (
+        '<!DOCTYPE html>\n'
+        '<input type="text" class="field"> &amp;\n'
+        '<!-- <html lang="en">\n'
+        '     <h1 src="app.js">Hello</h1> -->\n'
+        '<script src="app.js"></script>'
+    )
+    editor.setPlainText(source)
+    qapp.processEvents()
+
+    def color_at(token, occurrence=0):
+        position = -1
+        for _ in range(occurrence + 1):
+            position = source.index(token, position + 1)
+        block = editor.document().findBlock(position)
+        block_position = position - block.position()
+        for text_range in block.layout().formats():
+            if text_range.start <= block_position < text_range.start + text_range.length:
+                return text_range.format.foreground().color().name()
+        return None
+
+    assert color_at("input") == "#4fc3f7"
+    assert color_at("type") == "#9cdcfe"
+    assert color_at('"text"') == "#ce9178"
+    assert color_at("&amp;") == "#d7ba7d"
+    assert color_at("<html", 0) == "#77c7a6"
+    assert color_at("h1") == "#77c7a6"
+    assert color_at("src") == "#77c7a6"
+    assert color_at('"app.js"') == "#77c7a6"
+
+
 @pytest.mark.parametrize(
     ("filename", "commented_lines"),
     [

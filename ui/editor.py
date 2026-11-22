@@ -256,7 +256,7 @@ class SourceHighlighter(QSyntaxHighlighter):
             self._rules.append((QRegularExpression(pattern), text_format, capture_group))
 
         keywords = SOURCE_KEYWORDS.get(language, [])
-        if keywords:
+        if keywords and language != "html":
             keyword_color = {
                 "css": "#45c7b8",
                 "javascript": "#ff6b9d",
@@ -306,12 +306,21 @@ class SourceHighlighter(QSyntaxHighlighter):
         comment_color = {"css": "#77c7a6", "javascript": "#77c7a6"}.get(language, "#6a9955")
         add(r"\b\d+(?:\.\d+)?\b", number_color)
         add(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"|`[^`]*`", string_color)
+        if language == "html":
+            add(r"</?|/?>", "#808080")
+            add(r"</?([A-Za-z][\w:-]*)", "#4fc3f7", True, capture_group=1)
+            add(
+                r"\s+([A-Za-z_:][\w:.-]*)(?=\s*(?:=|/?>))",
+                "#9cdcfe",
+                capture_group=1,
+            )
+            add(r"<!DOCTYPE\b", "#c586c0", True)
+            add(r"&(?:#[0-9]+|#x[0-9a-fA-F]+|[A-Za-z][\w]+);", "#d7ba7d")
+            self._html_comment_format = QTextCharFormat()
+            self._html_comment_format.setForeground(QColor("#77c7a6"))
         if language in {"javascript", "css", "c", "cpp", "java"}:
             add(r"//[^\n]*|/\*.*?\*/", comment_color)
-        if language == "html":
-            add(r"<!--.*?-->", "#77c7a6")
-            add(r"</?[A-Za-z][^>]*>", "#4fc3f7", True)
-        elif language == "css":
+        if language == "css":
             add(r"^[ \t]*[-\w]+(?=\s*:)", "#45c7b8")
             add(r"^[^{]+(?=\s*\{)", "#ff9f68")
             add(r"@[\w-]+", "#d8a7ff", True)
@@ -336,6 +345,28 @@ class SourceHighlighter(QSyntaxHighlighter):
                     length = match.capturedLength()
                 if start >= 0 and length > 0:
                     self.setFormat(start, length, text_format)
+        if self.language == "html":
+            comment_start = (
+                0 if self.previousBlockState() == 1 else text.find("<!--")
+            )
+            while comment_start >= 0:
+                comment_end = text.find("-->", comment_start)
+                if comment_end < 0:
+                    self.setFormat(
+                        comment_start,
+                        len(text) - comment_start,
+                        self._html_comment_format,
+                    )
+                    self.setCurrentBlockState(1)
+                    break
+                self.setFormat(
+                    comment_start,
+                    comment_end + 3 - comment_start,
+                    self._html_comment_format,
+                )
+                comment_start = text.find("<!--", comment_end + 3)
+            else:
+                self.setCurrentBlockState(0)
 
 
 class LineNumberArea(QWidget):
