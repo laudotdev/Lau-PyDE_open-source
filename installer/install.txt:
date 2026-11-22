@@ -1,0 +1,2 @@
+install.txt:
+sudo pacman -U /home/laurence_linux/lau-pyde_open-source/installer/arch/lau-pyde-1.2.0-1-any.pkg.tar.zst
