@@ -316,23 +316,36 @@ For users who prioritize receiving development updates earlier, installing direc
 
 ### Windows Installer
 
-Windows users can download **Lau-PyDE-Setup.exe** here:
+> **Note:** `Lau-PyDE_setup_v1.2.0.exe` is not available. Install v1.2.0 from the source repository using the steps below.
 
-https://laupyde.online
+> **Compatibility:** Lau-PyDE is primarily developed and tested on Linux-based distributions, where it has the strongest compatibility. Windows is also supported, but some behavior may differ by system.
 
-The standalone installer is the recommended Windows installation method for users who prefer a straightforward installation process.
+#### Install Lau-PyDE v1.2.0
 
-### Install Python
+1. Install Python 3.10 or newer from [python.org](https://www.python.org/downloads/windows/). In the installer, enable **Add python.exe to PATH**.
+2. Install [Git for Windows](https://git-scm.com/download/win).
+3. Open PowerShell and confirm Python is available:
 
-Install Python from:
+   ```powershell
+   py --version
+   ```
 
-https://www.python.org/downloads/windows/
+4. Install Lau-PyDE from the project repository:
 
-Check it:
+   ```powershell
+   py -m pip install --upgrade pip
+   py -m pip install git+https://github.com/laudotdev/Lau-PyDE_open-source.git
+   ```
 
-```powershell
-py --version
-```
+5. Start the application:
+
+   ```powershell
+   pyde lau
+   ```
+
+If PowerShell says `pyde` is not recognized, close and reopen PowerShell so the Python Scripts directory is added to the session PATH.
+
+For the previous version, download **Lau-PyDE-Setup.exe** from [laupyde.online](https://laupyde.online).
 
 ---
 
@@ -445,6 +458,53 @@ Then run:
 ```bash
 pyde lau
 ```
+
+### Install the Full App with the Linux Shell Installer
+
+This is an alternative to the pipx steps above. It installs the full app under your home directory using `installer/linux/install.sh`. It also works on Arch Linux; the native Arch package instructions remain a separate installation option.
+
+1. Install Git and Python 3.10 or newer with virtual-environment support using your distro's package manager. For example:
+
+   **Arch Linux:**
+
+   ```bash
+   sudo pacman -S --needed git python
+   ```
+
+   **Ubuntu or Debian:**
+
+   ```bash
+   sudo apt update
+   sudo apt install git python3 python3-venv
+   ```
+
+   **Fedora:**
+
+   ```bash
+   sudo dnf install git python3
+   ```
+
+2. Clone the Lau-PyDE repository and enter its folder:
+
+   ```bash
+   git clone https://github.com/laudotdev/Lau-PyDE_open-source.git
+   cd Lau-PyDE_open-source
+   ```
+
+3. Run the Linux installer from the repository root:
+
+   ```bash
+   ./installer/linux/install.sh
+   ```
+
+4. Ensure `~/.local/bin` is on your `PATH`. Open a new terminal if you just added it.
+5. Launch Lau-PyDE:
+
+   ```bash
+   lau-pyde
+   ```
+
+The shell installer creates a virtual environment and installs the app, launcher, desktop entry, and icon under your home directory. To remove this user-local installation, run `./installer/linux/uninstall.sh` from the cloned repository.
 
 ### Install Directly from Git
 
@@ -633,12 +693,14 @@ With v1.2.0, Lau-PyDE introduces multi-file and multi-language editing capabilit
 - Dolphin drag-and-drop folder integration
 - Persistent keyboard shortcut visibility
 - Redesigned in-editor welcome experience
+- HTML, CSS, JS improved syntax coloring (for var, functions, built-ins, name call and etc.)
+- Auto language comment detection e.g. highlight block then Ctrl + / for js now `// commented block`
 
 The expansion does not change the project's core identity:
 
 > **Lau-PyDE remains a Python Development Environment with additional multi-language editing capabilities.**
 
-## Not in Scope
+## Not in Scope `Impossible features`
 
 The following features remain outside the current project scope:
 
