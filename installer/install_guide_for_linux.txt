@@ -1,0 +1,17 @@
+to install: (for arch)
+sudo pacman -U /home/laurence_linux/lau-pyde_open-source/installer/arch/lau-pyde-1.2.0-1-any.pkg.tar.zst
+
+to uninstall: (for arch)
+sudo pacman -R lau-pyde
+
+to install: (for generic linux based-distros)
+step 1:
+./installer/linux/install.sh
+
+step 2: (if this message appears `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc source ~/.bashrc lau-pyde`)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+lau-pyde
+
+to uninstall: (for generic linux based-distros)
+./installer/linux/uninstall.sh
