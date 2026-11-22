@@ -14,4 +14,3 @@ chmod +x "$STAGE/lau-pyde-$VERSION/installer/lau-pyde-bin"
 tar -C "$STAGE" -czf "$ROOT/installer/arch/lau-pyde-$VERSION.tar.gz" "lau-pyde-$VERSION"
 cd "$ROOT/installer/arch"
 makepkg -f
-

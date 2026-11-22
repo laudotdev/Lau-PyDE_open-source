@@ -1,11 +1,11 @@
 pkgname=lau-pyde
-pkgver=1.1.0
+pkgver=1.2.0
 pkgrel=1
 pkgdesc='A simple and lightweight Python Development Environment'
 arch=('any')
 url='https://github.com/laudotdev/Lau-PyDE_open-source'
 license=('MIT')
-depends=('python' 'python-pyside6')
+depends=('python' 'pyside6')
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=('SKIP')
 
@@ -14,7 +14,7 @@ package() {
     install -dm755 "$pkgdir/usr/share/$pkgname"
     cp -a assets core ui main.py launcher.py pyproject.toml "$pkgdir/usr/share/$pkgname/"
     install -Dm755 installer/lau-pyde-bin "$pkgdir/usr/bin/lau-pyde"
-    install -Dm644 installer/lau-pyde.desktop "$pkgdir/usr/share/applications/lau-pyde.desktop"
-    install -Dm644 installer/lau-pyde_logo.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/lau-pyde.png"
+    install -Dm644 installer/linux/lau-pyde.desktop "$pkgdir/usr/share/applications/lau-pyde.desktop"
+    install -Dm644 installer/linux/lau-pyde_logo.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/lau-pyde.png"
 }
 
