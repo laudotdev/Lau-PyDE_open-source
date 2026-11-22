@@ -1858,6 +1858,22 @@ class CodeEditor(QPlainTextEdit):
         self.setTextCursor(cursor)
     def toggle_comment(self):
         cursor = self.textCursor()
+        comment_markers = {
+            "python": ("#", ""),
+            "javascript": ("//", ""),
+            "css": ("/*", "*/"),
+            "html": ("<!--", "-->"),
+            "markdown": ("<!--", "-->"),
+            "json": ("//", ""),
+            "yaml": ("#", ""),
+            "toml": ("#", ""),
+            "c": ("//", ""),
+            "cpp": ("//", ""),
+            "java": ("//", ""),
+            "go": ("//", ""),
+            "rust": ("//", ""),
+        }
+        comment_prefix, comment_suffix = comment_markers.get(self._language, ("#", ""))
 
         start_block = self.document().findBlock(
             cursor.selectionStart()
@@ -1890,8 +1906,14 @@ class CodeEditor(QPlainTextEdit):
             block.text() for block in blocks if block.text().strip()
         ]
 
+        def is_commented(line: str) -> bool:
+            content = line.lstrip()
+            return content.startswith(comment_prefix) and (
+                not comment_suffix or content.rstrip().endswith(comment_suffix)
+            )
+
         uncomment = bool(non_empty_lines) and all(
-            line.lstrip().startswith("#")
+            is_commented(line)
             for line in non_empty_lines
         )
 
@@ -1904,32 +1926,26 @@ class CodeEditor(QPlainTextEdit):
                 continue
 
             line_cursor = QTextCursor(block)
-            line_cursor.movePosition(QTextCursor.StartOfBlock)
+            indent = len(line) - len(line.lstrip())
+            content = line[indent:]
 
             if uncomment:
-                # Remove the comment marker and one optional space.
-                stripped = line.lstrip()
-                indent = len(line) - len(stripped)
-                line_cursor.movePosition(
-                    QTextCursor.Right,
-                    QTextCursor.MoveAnchor,
-                    indent,
-                )
-                line_cursor.deleteChar()  # Remove '#'
-
-                if line_cursor.block().text()[
-                    line_cursor.positionInBlock():
-                ].startswith(" "):
-                    line_cursor.deleteChar()
+                content = content[len(comment_prefix):]
+                if content.startswith(" "):
+                    content = content[1:]
+                if comment_suffix:
+                    content = content.rstrip()
+                    content = content[:-len(comment_suffix)]
+                    if content.endswith(" "):
+                        content = content[:-1]
             else:
-                # Insert the comment marker after indentation.
-                indent = len(line) - len(line.lstrip())
-                line_cursor.movePosition(
-                    QTextCursor.Right,
-                    QTextCursor.MoveAnchor,
-                    indent,
-                )
-                line_cursor.insertText("# ")
+                content = f"{comment_prefix} {content}"
+                if comment_suffix:
+                    content += f" {comment_suffix}"
+
+            line_cursor.movePosition(QTextCursor.StartOfBlock)
+            line_cursor.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+            line_cursor.insertText(" " * indent + content)
 
         cursor.endEditBlock()
 

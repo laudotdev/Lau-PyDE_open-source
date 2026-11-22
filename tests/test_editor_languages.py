@@ -201,6 +201,32 @@ def test_javascript_highlighter_colors_common_tokens(qapp):
     assert color_at("should stay") == "#77c7a6"
 
 
+@pytest.mark.parametrize(
+    ("filename", "commented_lines"),
+    [
+        ("sample.py", "    # first line\n    # second line"),
+        ("sample.js", "    // first line\n    // second line"),
+        ("sample.css", "    /* first line */\n    /* second line */"),
+        ("sample.html", "    <!-- first line -->\n    <!-- second line -->"),
+    ],
+)
+def test_ctrl_slash_uses_language_comment_syntax(qapp, filename, commented_lines):
+    editor = CodeEditor()
+    editor.set_file_path(filename)
+    editor.setPlainText("    first line\n    second line")
+    cursor = editor.textCursor()
+    cursor.select(QTextCursor.Document)
+    editor.setTextCursor(cursor)
+
+    shortcut = QKeyEvent(QEvent.KeyPress, Qt.Key_Slash, Qt.ControlModifier, "/")
+    editor.keyPressEvent(shortcut)
+    assert editor.toPlainText() == commented_lines
+
+    shortcut = QKeyEvent(QEvent.KeyPress, Qt.Key_Slash, Qt.ControlModifier, "/")
+    editor.keyPressEvent(shortcut)
+    assert editor.toPlainText() == "    first line\n    second line"
+
+
 def test_file_icons_use_custom_language_artwork(qapp, tmp_path, monkeypatch):
     from PySide6.QtCore import QFileInfo
     from pathlib import Path
