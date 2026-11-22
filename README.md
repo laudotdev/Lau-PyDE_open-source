@@ -1,5 +1,7 @@
 # Lau-PyDE
 
+![Lau-PyDE logo](assets/lau-pyde_v1.2.0.png)
+
 **Lau-PyDE** is a lightweight Python Development Environment (PyDE) built with **Python + PySide6 + Qt**.
 
 > **Version:** 1.2.0  
