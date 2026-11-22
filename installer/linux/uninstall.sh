@@ -7,5 +7,5 @@ DESKTOP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 ICON_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/512x512/apps"
 rm -rf "$APP_DIR"
 rm -f "$BIN_DIR/lau-pyde" "$DESKTOP_DIR/lau-pyde.desktop" "$ICON_DIR/lau-pyde.png"
-echo "Lau-PyDE uninstalled."
+echo "Lau-PyDE uninstalled successfully!"
 
