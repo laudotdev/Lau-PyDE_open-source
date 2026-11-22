@@ -49,7 +49,7 @@ MODULE_ATTRS = {
 SOURCE_KEYWORDS = {
     "html": ["a", "article", "aside", "body", "button", "div", "doctype", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "html", "img", "input", "label", "li", "link", "main", "meta", "nav", "ol", "option", "p", "section", "script", "select", "span", "style", "table", "td", "textarea", "th", "title", "tr", "ul"],
     "css": ["align-items", "background", "border", "color", "display", "flex", "font", "grid", "height", "justify-content", "margin", "padding", "position", "width"],
-    "javascript": ["async", "await", "break", "case", "catch", "class", "const", "continue", "default", "else", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "let", "new", "null", "return", "switch", "this", "throw", "true", "try", "typeof", "var", "while"],
+    "javascript": ["as", "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "export", "extends", "false", "finally", "for", "from", "function", "if", "import", "in", "instanceof", "let", "new", "null", "of", "return", "static", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "yield"],
     "markdown": ["heading", "link", "image", "code", "list", "quote"],
     "json": ["false", "null", "true"],
     "yaml": ["false", "no", "null", "true", "yes"],
@@ -246,12 +246,14 @@ class SourceHighlighter(QSyntaxHighlighter):
         self.language = language
         self._rules = []
 
-        def add(pattern: str, color: str, bold: bool = False) -> None:
+        def add(
+            pattern: str, color: str, bold: bool = False, capture_group: int = 0
+        ) -> None:
             text_format = QTextCharFormat()
             text_format.setForeground(QColor(color))
             if bold:
                 text_format.setFontWeight(QFont.Bold)
-            self._rules.append((QRegularExpression(pattern), text_format))
+            self._rules.append((QRegularExpression(pattern), text_format, capture_group))
 
         keywords = SOURCE_KEYWORDS.get(language, [])
         if keywords:
@@ -260,6 +262,45 @@ class SourceHighlighter(QSyntaxHighlighter):
                 "javascript": "#ff6b9d",
             }.get(language, "#c586c0")
             add(r"\b(?:" + "|".join(re.escape(word) for word in keywords) + r")\b", keyword_color, True)
+        if language == "javascript":
+            add(
+                r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)",
+                "#f2cc60",
+                capture_group=1,
+            )
+            globals_pattern = "|".join(
+                re.escape(name) for name in sorted(JAVASCRIPT_GLOBALS)
+            )
+            add(r"\b(?:" + globals_pattern + r")\b", "#4fc1ff")
+            add(
+                r"\b(?!(?:"
+                + "|".join(re.escape(word) for word in keywords)
+                + r")\b)([A-Za-z_$][\w$]*)(?=\s*\()",
+                "#dcdcaa",
+                capture_group=1,
+            )
+            add(
+                r"\bfunction\s*\*?\s+([A-Za-z_$][\w$]*)",
+                "#82aaff",
+                True,
+                capture_group=1,
+            )
+            add(
+                r"\.\s*([A-Za-z_$][\w$]*)",
+                "#9cdcfe",
+                capture_group=1,
+            )
+            add(
+                r"\.\s*([A-Za-z_$][\w$]*)(?=\s*\()",
+                "#4ec9b0",
+                capture_group=1,
+            )
+            add(
+                r"\b([A-Za-z_$][\w$]*)(?=\s*:)",
+                "#9cdcfe",
+                capture_group=1,
+            )
+            add(r"===|!==|=>|==|!=|<=|>=|&&|\|\||\?\?|[-+*/%=&|<>!?:]", "#c586c0")
         number_color = {"css": "#b8df6f", "javascript": "#b8df6f"}.get(language, "#b5cea8")
         string_color = {"css": "#f4a261", "javascript": "#ffd580"}.get(language, "#ce9178")
         comment_color = {"css": "#77c7a6", "javascript": "#77c7a6"}.get(language, "#6a9955")
@@ -274,9 +315,6 @@ class SourceHighlighter(QSyntaxHighlighter):
             add(r"^[ \t]*[-\w]+(?=\s*:)", "#45c7b8")
             add(r"^[^{]+(?=\s*\{)", "#ff9f68")
             add(r"@[\w-]+", "#d8a7ff", True)
-        elif language == "javascript":
-            add(r"\bfunction\s+([A-Za-z_$][\w$]*)", "#82aaff", True)
-            add(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)", "#f2cc60")
         elif language == "markdown":
             add(r"^\s{0,3}#{1,6}\s+.*$", "#569cd6", True)
             add(r"`[^`]+`", "#ce9178")
@@ -286,11 +324,18 @@ class SourceHighlighter(QSyntaxHighlighter):
             add(r"\b(?:true|false|null)\b", "#569cd6", True)
 
     def highlightBlock(self, text: str) -> None:
-        for pattern, text_format in self._rules:
+        for pattern, text_format, capture_group in self._rules:
             matches = pattern.globalMatch(text)
             while matches.hasNext():
                 match = matches.next()
-                self.setFormat(match.capturedStart(), match.capturedLength(), text_format)
+                if capture_group:
+                    start = match.capturedStart(capture_group)
+                    length = match.capturedLength(capture_group)
+                else:
+                    start = match.capturedStart()
+                    length = match.capturedLength()
+                if start >= 0 and length > 0:
+                    self.setFormat(start, length, text_format)
 
 
 class LineNumberArea(QWidget):

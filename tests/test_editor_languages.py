@@ -169,6 +169,38 @@ def test_css_and_javascript_use_distinct_keyword_colors(qapp):
     assert len(set(colors.values())) == 3
 
 
+def test_javascript_highlighter_colors_common_tokens(qapp):
+    editor = CodeEditor()
+    editor.set_file_path("sample.js")
+    source = (
+        'const appendBtn = document.getElementById("updateFile");\n'
+        'function appendFunction() { return fetch("/api/write_file", { method: "POST" }); }\n'
+        "// appendFunction() should stay comment-colored.\n"
+    )
+    editor.setPlainText(source)
+    qapp.processEvents()
+
+    def color_at(token):
+        position = source.index(token)
+        block = editor.document().findBlock(position)
+        block_position = position - block.position()
+        for text_range in block.layout().formats():
+            if text_range.start <= block_position < text_range.start + text_range.length:
+                return text_range.format.foreground().color().name()
+        return None
+
+    assert color_at("const") == "#ff6b9d"
+    assert color_at("appendBtn") == "#f2cc60"
+    assert color_at("document") == "#4fc1ff"
+    assert color_at("getElementById") == "#4ec9b0"
+    assert color_at("updateFile") == "#ffd580"
+    assert color_at("appendFunction") == "#82aaff"
+    assert color_at("fetch") == "#dcdcaa"
+    assert color_at("method") == "#9cdcfe"
+    assert color_at("POST") == "#ffd580"
+    assert color_at("should stay") == "#77c7a6"
+
+
 def test_file_icons_use_custom_language_artwork(qapp, tmp_path, monkeypatch):
     from PySide6.QtCore import QFileInfo
     from pathlib import Path
