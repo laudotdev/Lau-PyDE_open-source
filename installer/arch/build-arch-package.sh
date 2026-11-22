@@ -5,7 +5,9 @@ VERSION="$(sed -n 's/^version = "\([^"]*\)"/\1/p' "$ROOT/pyproject.toml")"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/lau-pyde-$VERSION"
-cp -a "$ROOT"/{assets,core,ui,main.py,launcher.py,pyproject.toml,installer} "$STAGE/lau-pyde-$VERSION/"
+cp -a "$ROOT"/{assets,core,ui,main.py,launcher.py,pyproject.toml} "$STAGE/lau-pyde-$VERSION/"
+mkdir -p "$STAGE/lau-pyde-$VERSION/installer"
+cp -a "$ROOT/installer/linux" "$STAGE/lau-pyde-$VERSION/installer/"
 cat > "$STAGE/lau-pyde-$VERSION/installer/lau-pyde-bin" <<'EOF'
 #!/usr/bin/env bash
 exec /usr/bin/python /usr/share/lau-pyde/launcher.py lau "$@"
