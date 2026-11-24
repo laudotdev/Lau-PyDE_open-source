@@ -131,6 +131,7 @@ These features provide lightweight assistance without requiring a full language 
 - Close Project support
 - Empty project state when no project is open
 - Explorer shows code-issue counts for files with detected problems
+- Explorer displays hidden dotfiles such as `.gitignore` and `.env`
 - Project root folder name and icon remain visible after restarting Lau-PyDE
 - Opened project paths are persisted as absolute paths for Linux and Windows
 - Missing or moved saved projects are handled without crashing
@@ -192,6 +193,7 @@ These features provide lightweight assistance without requiring a full language 
 - Output orientation can move between bottom and right layouts
 - Persistent Show Key Shortcuts option
 - Shared custom file icons for supported file types
+- Dedicated SVG icons for `.gitignore` and `.env` files
 - Consistent editor tab appearance and SVG-based tab close controls
 - Improved workspace navigation and synchronization
 - Markdown preview toggle

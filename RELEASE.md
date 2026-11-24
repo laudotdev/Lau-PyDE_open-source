@@ -13,6 +13,8 @@ Lau-PyDE v1.2.0 expands the editor beyond Python while keeping Python as its pri
 - **Language-aware syntax colors:** Expanded JavaScript highlighting for keywords, declared variables, functions, built-ins, members, properties, and operators. HTML highlighting distinguishes tags, attributes, values, entities, and comments, including comments that span lines.
 - **Comment toggling:** Use `Ctrl+/` to comment or uncomment selected lines with the active language's syntax, such as `//` for JavaScript and `#` for Python.
 - **Editing assistance:** CSS and JavaScript completions, HTML abbreviations and snippets, lightweight diagnostics, and Markdown preview.
+- **Hidden dotfiles:** The Explorer displays dotfiles such as `.gitignore` and `.env` in project folders.
+- **Dotfile artwork:** `.gitignore` and `.env` files have dedicated SVG icons in the Explorer and editor tabs.
 - **Workspace improvements:** Shared file icons, improved workspace synchronization, Dolphin folder drag-and-drop, a redesigned welcome screen, and a persistent Key Shortcuts visibility preference.
 
 Lau-PyDE's built-in Run action remains for Python. Editing another language does not provide a built-in runtime for it.
