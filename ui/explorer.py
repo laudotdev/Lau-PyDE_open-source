@@ -718,6 +718,9 @@ class FileExplorer(QWidget):
                 shutil.rmtree(p)
             else:
                 p.unlink()
+
+            if p.exists():
+                raise OSError("File still exists after deletion.")
         except OSError as e:
             QMessageBox.critical(self, 'Error', f'Could not delete:\n{e}')
             return
