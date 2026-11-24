@@ -30,6 +30,11 @@ ICON_FILES = {
     ".rs": "file-rust.svg",
 }
 
+DOTFILE_ICONS = {
+    ".gitignore": "file-gitignore.svg",
+    ".env": "file-env.svg",
+}
+
 _ICON_DIR = Path(__file__).resolve().parent.parent / "assets" / "icons"
 
 
@@ -39,8 +44,10 @@ class LauPydeFileIconProvider(QFileIconProvider):
 
     def icon(self, file_info):
         if isinstance(file_info, QFileInfo) and file_info.isFile():
+            icon_name = DOTFILE_ICONS.get(file_info.fileName().lower())
             suffix = file_info.suffix().lower()
-            icon_name = ICON_FILES.get(f".{suffix}") if suffix else None
+            if not icon_name:
+                icon_name = ICON_FILES.get(f".{suffix}") if suffix else None
             if icon_name:
                 icon = QIcon(str(_ICON_DIR / icon_name))
                 if not icon.isNull():
