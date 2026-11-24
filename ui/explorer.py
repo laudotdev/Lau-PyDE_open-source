@@ -104,13 +104,13 @@ class FileExplorer(QWidget):
             "*.py", "*.txt", "*.html", "*.htm", "*.css", "*.js", "*.mjs",
             "*.cjs", "*.md", "*.json", "*.yaml", "*.yml", "*.cfg", "*.toml",
             "*.c", "*.h", "*.cc", "*.cpp", "*.cxx", "*.hpp", "*.hh",
-            "*.java", "*.go", "*.rs",
+            "*.java", "*.go", "*.rs", ".*",
         ])
         # Keep folders visible while filtering file names so the user can
         # browse the full directory hierarchy (expand/collapse folders).
         self._model.setNameFilterDisables(True)
         # Show directories and files; hide '.' and '..'
-        self._model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files)
+        self._model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files | QDir.Hidden)
         self._model.directoryLoaded.connect(self._on_directory_loaded)
 
         self._error_counts = {}
